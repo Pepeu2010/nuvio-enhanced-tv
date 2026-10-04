@@ -1,5 +1,7 @@
 package com.nuvio.tv.data.repository
 
+import com.nuvio.tv.core.diagnostics.redactDiagnosticText
+
 import android.content.Context
 import android.util.Log
 import com.google.gson.Gson
@@ -121,7 +123,7 @@ class AddonRepositoryImpl(
         syncJob = syncScope.launch {
             delay(500)
             val result = addonSyncService.pushToRemote()
-            Log.d(TAG, "triggerRemoteSync: push result=${result.isSuccess} ${result.exceptionOrNull()?.message ?: ""}")
+            Log.d(TAG, "triggerRemoteSync: push result=${result.isSuccess} error=${result.exceptionOrNull()?.javaClass?.simpleName ?: "none"}")
         }
     }
 
@@ -306,12 +308,12 @@ class AddonRepositoryImpl(
             is NetworkResult.Success -> {
                 val addon = result.data.toDomain(cleanBaseUrl)
                 if (putCachedManifestIfChanged(cleanBaseUrl, addon)) {
-                    Log.d(TAG, "Updated addon manifest cache url=$cleanBaseUrl version=${addon.version} configVersion=${addon.configVersion}")
+                    Log.d(TAG, "Updated addon manifest cache url=${redactDiagnosticText(cleanBaseUrl)} version=${addon.version} configVersion=${addon.configVersion}")
                 }
                 NetworkResult.Success(addon)
             }
             is NetworkResult.Error -> {
-                Log.w(TAG, "Failed to fetch addon manifest for url=$manifestUrl code=${result.code} message=${result.message}")
+                Log.w(TAG, "Failed to fetch addon manifest for url=${redactDiagnosticText(manifestUrl)} code=${result.code} message=${redactDiagnosticText(result.message)}")
                 result
             }
             NetworkResult.Loading -> NetworkResult.Loading

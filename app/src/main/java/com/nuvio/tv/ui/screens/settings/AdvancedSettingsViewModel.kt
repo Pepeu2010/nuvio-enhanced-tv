@@ -24,7 +24,7 @@ data class AdvancedSettingsUiState(
     val playbackIssueReportsEnabled: Boolean = false,
     val playerStatsHudEnabled: Boolean = false,
     val rgb565Enabled: Boolean = true,
-    val sentryEnabled: Boolean = true
+    val sentryEnabled: Boolean = false
 )
 
 sealed class AdvancedSettingsEvent {

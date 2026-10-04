@@ -73,6 +73,20 @@ object SentryInitializer {
             options.beforeSend = SentryOptions.BeforeSendCallback { event, _ ->
                 event.request = null
                 event.user = null
+                event.serverName = null
+                event.message?.let { message ->
+                    message.formatted = message.formatted?.let(::redactDiagnosticText)
+                    message.message = message.message?.let(::redactDiagnosticText)
+                    message.params = message.params?.map(::redactDiagnosticText)
+                }
+                event.exceptions?.forEach { exception ->
+                    exception.value = exception.value?.let(::redactDiagnosticText)
+                }
+                event.transaction = event.transaction?.let(::redactDiagnosticText)
+                event.breadcrumbs?.forEach { breadcrumb ->
+                    breadcrumb.message = breadcrumb.message?.let(::redactDiagnosticText)
+                    breadcrumb.data.clear()
+                }
                 if (shouldDrop(event)) null else event
             }
         }

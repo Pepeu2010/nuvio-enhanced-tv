@@ -1,3 +1,8 @@
+> **Nuvio Enhanced TV — unofficial development fork.**
+> Read [FORK_NOTICE.md](FORK_NOTICE.md) and the
+> [project milestone status](https://github.com/Pepeu2010/nuvio-enhanced).
+> The upstream documentation below is retained for compatibility reference.
+
 <div align="center">
 
   <img src="assets/brand/app_logo_wordmark.png" alt="Nuvio" width="300" />
