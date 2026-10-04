@@ -1,6 +1,7 @@
 package com.nuvio.tv.ui.navigation
 
 import com.nuvio.tv.ui.theme.NuvioMotion
+import com.nuvio.tv.ui.theme.LocalNavigationMotion
 import com.nuvio.tv.ui.components.PlaybackAvailabilityProvider
 import com.nuvio.tv.ui.components.LocalPlaybackAvailability
 import com.nuvio.tv.ui.components.canStream
@@ -75,6 +76,7 @@ private fun PlaybackNavHost(
     hideBuiltInHeaders: Boolean
 ) {
     val playbackAvailability = LocalPlaybackAvailability.current
+    val navigationDuration = LocalNavigationMotion.current.durationMillis(NuvioMotion.tokens.durations.medium)
     val context = LocalContext.current
     fun isStreamToPlayer(from: String, to: String): Boolean {
         return from.startsWith("stream/") && to.startsWith("player/")
@@ -96,7 +98,7 @@ private fun PlaybackNavHost(
             if (isStreamToPlayer(from, to) && isAutoPlayNav) {
                 EnterTransition.None
             } else {
-                fadeIn(animationSpec = tween(NuvioMotion.tokens.durations.medium))
+                fadeIn(animationSpec = tween(navigationDuration))
             }
         },
         exitTransition = {
@@ -108,7 +110,7 @@ private fun PlaybackNavHost(
             if (isStreamToPlayer(from, to) && isAutoPlayNav) {
                 ExitTransition.None
             } else {
-                fadeOut(animationSpec = tween(NuvioMotion.tokens.durations.medium))
+                fadeOut(animationSpec = tween(navigationDuration))
             }
         },
         popEnterTransition = {
@@ -120,7 +122,7 @@ private fun PlaybackNavHost(
             if (isPlayerToStream(from, to) && isAutoPlayNav) {
                 EnterTransition.None
             } else {
-                fadeIn(animationSpec = tween(NuvioMotion.tokens.durations.medium))
+                fadeIn(animationSpec = tween(navigationDuration))
             }
         },
         popExitTransition = {
@@ -132,7 +134,7 @@ private fun PlaybackNavHost(
             if (isPlayerToStream(from, to) && isAutoPlayNav) {
                 ExitTransition.None
             } else {
-                fadeOut(animationSpec = tween(NuvioMotion.tokens.durations.medium))
+                fadeOut(animationSpec = tween(navigationDuration))
             }
         }
     ) {

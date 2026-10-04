@@ -7,6 +7,17 @@ import org.junit.Test
 
 class ThemeAccessTest {
     @Test
+    fun reducedNavigationIsNonSpatialAndCorruptStoredPreferencesKeepWorking() {
+        assertFalse(NavigationMotion.REDUCED.allowsSpatialEffects)
+        assertEquals(120, NavigationMotion.REDUCED.durationMillis(700))
+        assertEquals(80, NavigationMotion.REDUCED.durationMillis(80))
+        assertEquals(0, NavigationMotion.OFF.durationMillis(700))
+        assertEquals(NavigationMotion.FULL, NavigationMotion.fromName(null))
+        assertEquals(NavigationMotion.FULL, NavigationMotion.fromName("invalid"))
+        assertEquals(NavigationMotion.OFF, NavigationMotion.fromName("OFF"))
+    }
+
+    @Test
     fun customThemesAreAvailableWithoutMembership() {
         val themes = availableAppThemes(CosmeticEntitlements.None)
 

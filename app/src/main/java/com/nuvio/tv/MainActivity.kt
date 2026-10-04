@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.AnimatedVisibility
@@ -589,13 +590,19 @@ open class MainActivity : ComponentActivity() {
             }
             val discoverLocation = mainUiPrefs.discoverLocation
 
+            val navigationMotion by key(activeProfileId, startupSession) {
+                themeDataStore.navigationMotion.collectAsStateWithLifecycle(
+                    initialValue = com.nuvio.tv.domain.model.NavigationMotion.OFF
+                )
+            }
             NuvioTheme(
                 appTheme = mainUiPrefs.theme,
                 customThemeColors = mainUiPrefs.customThemeColors,
                 appFont = mainUiPrefs.font,
                 amoledMode = mainUiPrefs.amoledMode,
                 amoledSurfacesMode = mainUiPrefs.amoledSurfacesMode,
-                settingsUiStyle = mainUiPrefs.settingsUiStyle
+                settingsUiStyle = mainUiPrefs.settingsUiStyle,
+                navigationMotion = navigationMotion
             ) {
                 val defaultBringIntoViewSpec = LocalBringIntoViewSpec.current
                 val bringIntoViewSpec = if (mainUiPrefs.smoothBringIntoViewEnabled) {

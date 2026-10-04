@@ -9,6 +9,7 @@ import com.nuvio.tv.domain.model.AppTheme
 import com.nuvio.tv.domain.model.CustomThemeColors
 import com.nuvio.tv.domain.model.SettingsUiStyle
 import com.nuvio.tv.domain.model.ThemeSelection
+import com.nuvio.tv.domain.model.NavigationMotion
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -23,6 +24,8 @@ class ThemeDataStore @Inject constructor(
 ) {
     companion object {
         private const val FEATURE = "theme_settings"
+        // Existing sync exports every key in FEATURE. Keep Enhanced-only rules local.
+        internal const val LOCAL_FEATURE = "enhanced_local_theme_settings"
     }
 
     private fun store(profileId: Int = profileManager.activeProfileId.value) =
@@ -34,6 +37,17 @@ class ThemeDataStore @Inject constructor(
     private val amoledModeKey = booleanPreferencesKey("amoled_mode")
     private val amoledSurfacesModeKey = booleanPreferencesKey("amoled_surfaces_mode")
     private val settingsUiStyleKey = stringPreferencesKey("settings_ui_style")
+    private val navigationMotionKey = stringPreferencesKey("enhanced_navigation_motion")
+
+    val navigationMotion: Flow<NavigationMotion> = profileManager.activeProfileId.flatMapLatest { pid ->
+        factory.get(pid, LOCAL_FEATURE).data.map { prefs -> NavigationMotion.fromName(prefs[navigationMotionKey]) }
+    }
+
+    suspend fun setNavigationMotion(mode: NavigationMotion) {
+        factory.get(profileManager.activeProfileId.value, LOCAL_FEATURE).edit { prefs ->
+            prefs[navigationMotionKey] = mode.name
+        }
+    }
 
     val themeSelection: Flow<ThemeSelection> = profileManager.activeProfileId.flatMapLatest { pid ->
         factory.get(pid, FEATURE).data.map { prefs ->

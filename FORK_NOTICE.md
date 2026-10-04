@@ -2,7 +2,7 @@
 
 Independent, unofficial native fork of NuvioMedia/NuvioTV. No endorsement by
 NuvioMedia is claimed. Upstream copyright, GPL-3.0 license and third-party notices
-remain applicable. The upstream README below is retained as reference.
+remain applicable. The upstream documentation is preserved in Git history.
 
 Project specification, audit, baseline results and milestone status:
 https://github.com/Pepeu2010/nuvio-enhanced

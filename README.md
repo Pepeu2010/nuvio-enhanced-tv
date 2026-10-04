@@ -1,37 +1,46 @@
-> **Nuvio Enhanced TV — unofficial development fork.**
-> Read [FORK_NOTICE.md](FORK_NOTICE.md) and the
-> [project milestone status](https://github.com/Pepeu2010/nuvio-enhanced).
-> The upstream documentation below is retained for compatibility reference.
+# Nuvio Enhanced TV
 
-<div align="center">
+**Uma evolução open source do Nuvio para Android TV, com mais recursos integrados à base nativa.** Fork independente e não oficial de [NuvioMedia/NuvioTV](https://github.com/NuvioMedia/NuvioTV).
 
-  <img src="assets/brand/app_logo_wordmark.png" alt="Nuvio" width="300" />
+Preservamos Kotlin, Jetpack Compose, TV Material 3, Media3, navegação, restauração de foco, seek progressivo e trailer pool existentes. Os sistemas atuais de conta, perfis, biblioteca, progresso, sync e addons Stremio continuam como pontos de integração.
 
-  <p>
-    A free, open-source media app for your phone, your desktop, and the TV you already own.
-    <br />
-    Bring your own sources. Nuvio turns them into a library with artwork, ratings, subtitles, and your place saved on every screen.
-  </p>
+## Download
 
-  [Website](https://nuvio.tv) · [GitHub releases](https://github.com/NuvioMedia/NuvioTV/releases/latest) · [Support Nuvio](https://nuvio.tv/support)
+[Baixar os APKs do Nuvio Enhanced](https://github.com/Pepeu2010/nuvio-enhanced/releases/tag/v0.1.0-alpha.1).
 
-</div>
+- **APK universal:** use quando não souber a arquitetura; inclui ARM 32/64 bits, x86 e x86_64.
+- **APKs por arquitetura:** arquivos menores para arm64-v8a, armeabi-v7a, x86 e x86_64.
+- Fontes e checksums SHA-256 acompanham a pré-release.
 
-## Get Nuvio TV
+São builds **Full Debug de desenvolvimento** para Android TV, com ID `io.github.pepeu2010.nuvioenhanced.tv.debug`. Ainda não são pacotes otimizados de produção ou uma interface dedicada a celulares. A release contém a fundação 0-C, anterior ao incremento 1-A.1 de movimento de navegação em main.
 
-- [Android TV on Google Play](https://play.google.com/store/apps/details?id=com.nuvio.app)
-- [Android TV APK](https://github.com/NuvioMedia/NuvioTV/releases/latest)
+## Melhorias e evolução
 
-## Build from source
+A fundação separa identidade, armazenamento e updater do fork, exige assinatura própria explícita para Release e desliga relatórios externos de falhas por padrão. Os diagnósticos de addons/campos Sentry revisados recebem redaction.
 
-```bash
-git clone https://github.com/NuvioMedia/NuvioTV.git
-cd NuvioTV
-./gradlew :app:assembleFullDebug
+O primeiro incremento 1-A.1 amplia a área Aparência existente com **Movimento de navegação** completo, reduzido e desligado, salvo localmente por perfil. Ele controla as transições revisadas entre telas; outros efeitos mantêm suas configurações atuais.
+
+Estão previstos: experiência cinematográfica própria para TV, melhores fluxos de foco/D-pad, Home/hero/previews aprimorados, Profile Studio, thumbnails reais/filmstrip/bookmarks, Source Intelligence e cache Auto/configurável. Live TV/EPG, Scene Info e Phone Remote entram nas fases posteriores, sem botões falsos ou canais incluídos.
+
+A referência de performance é TV Box de **2 GB de RAM e 1080p**. Suporte e FPS precisam de medição no aparelho, não de inferência a partir da compilação. A fundação passou em 84 testes direcionados; o baseline completo registrou 20 falhas herdadas e 1 teste ignorado. Login/sync/playback e QA em aparelhos reais permanecem pendentes. [Roadmap e evidências](https://github.com/Pepeu2010/nuvio-enhanced).
+
+## Compilar
+
+Use JDK 17, SDK Android e NDK nas versões de [BASELINE.md](https://github.com/Pepeu2010/nuvio-enhanced/blob/main/docs/BASELINE.md), além das propriedades públicas de desenvolvimento indicadas no workspace central.
+
+```powershell
+git clone https://github.com/Pepeu2010/nuvio-enhanced-tv.git
+cd nuvio-enhanced-tv
+git lfs pull
+.\gradlew.bat :app:assembleFullDebug
 ```
 
-Nuvio TV is built with Kotlin, Jetpack Compose, TV Material 3, and Media3. Development requires Android Studio, a JDK, and the Android SDK.
+No Linux/macOS, use `./gradlew`. Release exige chave/configuração próprias; nenhuma chave, senha ou configuração privada deve ir ao Git. Os APKs gerados ficam em `app/build/outputs/apk/full/debug/`.
 
-## License
+Antes de criar arquivos novos, localize e evolua as telas, ViewModels, repositories, models e componentes existentes. Preserve login/sync/addons e os motores atuais. Valide os fluxos por D-pad, inclusive retorno de foco e dialogs.
 
-[GNU General Public License v3.0](./LICENSE)
+## Licença e créditos
+
+[GPL-3.0](LICENSE), copyrights e avisos de terceiros preservados; [FORK_NOTICE.md](FORK_NOTICE.md) identifica a derivação. O histórico conserva a documentação original do upstream. Obrigado aos contribuidores do Nuvio.
+
+Não distribuímos canais, listas ou conteúdo protegido. As fontes legítimas são configuradas pelo usuário. Este projeto não é uma distribuição oficial Nuvio nem afirma endosso do NuvioMedia.

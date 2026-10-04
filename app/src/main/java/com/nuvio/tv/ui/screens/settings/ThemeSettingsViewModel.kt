@@ -7,6 +7,7 @@ import com.nuvio.tv.data.repository.MemberAccessRepository
 import com.nuvio.tv.domain.model.AppFont
 import com.nuvio.tv.domain.model.AppIconOption
 import com.nuvio.tv.domain.model.AppTheme
+import com.nuvio.tv.domain.model.NavigationMotion
 import com.nuvio.tv.domain.model.CosmeticEntitlements
 import com.nuvio.tv.domain.model.CustomThemeColors
 import com.nuvio.tv.domain.model.SettingsUiStyle
@@ -34,6 +35,7 @@ data class ThemeSettingsUiState(
     val selectedFont: AppFont = AppFont.INTER,
     val availableFonts: List<AppFont> = AppFont.entries.toList(),
     val amoledMode: Boolean = false,
+    val navigationMotion: NavigationMotion = NavigationMotion.FULL,
     val amoledSurfacesMode: Boolean = false,
     val settingsUiStyle: SettingsUiStyle = SettingsUiStyle.CLASSIC,
     val availableSettingsUiStyles: List<SettingsUiStyle> = SettingsUiStyle.entries.toList()
@@ -44,6 +46,7 @@ sealed class ThemeSettingsEvent {
     data class SaveCustomTheme(val colors: CustomThemeColors) : ThemeSettingsEvent()
     data class SelectFont(val font: AppFont) : ThemeSettingsEvent()
     data class ToggleAmoledMode(val enabled: Boolean) : ThemeSettingsEvent()
+    data class SelectNavigationMotion(val mode: NavigationMotion) : ThemeSettingsEvent()
     data class ToggleAmoledSurfacesMode(val enabled: Boolean) : ThemeSettingsEvent()
     data class SelectSettingsUiStyle(val style: SettingsUiStyle) : ThemeSettingsEvent()
     data object DismissAppIconFailure : ThemeSettingsEvent()
@@ -69,6 +72,11 @@ class ThemeSettingsViewModel @Inject constructor(
     }
 
     init {
+        viewModelScope.launch {
+            themeDataStore.navigationMotion.distinctUntilChanged().collectLatest { mode ->
+                _uiState.update { it.copy(navigationMotion = mode) }
+            }
+        }
         viewModelScope.launch {
             combine(
                 themeDataStore.themeSelection,
@@ -145,6 +153,9 @@ class ThemeSettingsViewModel @Inject constructor(
             is ThemeSettingsEvent.SaveCustomTheme -> saveCustomTheme(event.colors)
             is ThemeSettingsEvent.SelectFont -> selectFont(event.font)
             is ThemeSettingsEvent.ToggleAmoledMode -> setAmoledMode(event.enabled)
+            is ThemeSettingsEvent.SelectNavigationMotion -> {
+                viewModelScope.launch { themeDataStore.setNavigationMotion(event.mode) }
+            }
             is ThemeSettingsEvent.ToggleAmoledSurfacesMode -> setAmoledSurfacesMode(event.enabled)
             is ThemeSettingsEvent.SelectSettingsUiStyle -> selectSettingsUiStyle(event.style)
             ThemeSettingsEvent.DismissAppIconFailure -> appIconManager.clearFailure()

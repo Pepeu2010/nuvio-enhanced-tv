@@ -5,6 +5,7 @@ import com.nuvio.tv.data.local.ThemeDataStore
 import com.nuvio.tv.data.repository.MemberAccessRepository
 import com.nuvio.tv.domain.model.AppFont
 import com.nuvio.tv.domain.model.AppTheme
+import com.nuvio.tv.domain.model.NavigationMotion
 import com.nuvio.tv.domain.model.CustomThemeColors
 import com.nuvio.tv.domain.model.MemberAccess
 import com.nuvio.tv.domain.model.MemberTier
@@ -35,15 +36,31 @@ class ThemeSettingsViewModelTest {
     private val solid = CustomThemeColors.solid(0x445566)
     private val selection = MutableStateFlow(ThemeSelection(AppTheme.CUSTOM, gradient))
     private val access = MutableStateFlow(MemberAccess.None)
+    private val motion = MutableStateFlow(NavigationMotion.FULL)
     private val store = mockk<ThemeDataStore> {
         every { themeSelection } returns selection
         every { selectedFont } returns flowOf(AppFont.INTER)
         every { amoledMode } returns flowOf(false)
         every { amoledSurfacesMode } returns flowOf(false)
         every { settingsUiStyle } returns flowOf(SettingsUiStyle.CLASSIC)
+        every { navigationMotion } returns motion
+        coEvery { setNavigationMotion(any()) } coAnswers { motion.value = firstArg() }
         coEvery { setCustomTheme(any()) } coAnswers {
             selection.value = ThemeSelection(AppTheme.CUSTOM, firstArg())
         }
+    }
+
+    @Test
+    fun motionChoicePersistsAndReflectsChangesFromTheActiveProfileFlow() = runTest {
+        val viewModel = createViewModel()
+        runCurrent()
+        viewModel.onEvent(ThemeSettingsEvent.SelectNavigationMotion(NavigationMotion.OFF))
+        runCurrent()
+        coVerify(exactly = 1) { store.setNavigationMotion(NavigationMotion.OFF) }
+        assertEquals(NavigationMotion.OFF, viewModel.uiState.value.navigationMotion)
+        motion.value = NavigationMotion.REDUCED
+        runCurrent()
+        assertEquals(NavigationMotion.REDUCED, viewModel.uiState.value.navigationMotion)
     }
 
     @Test

@@ -2577,4 +2577,9 @@
     <string name="profile_default_name">Perfil %1$d</string>
     <string name="detail_tmdb_fallback_title">TMDB %1$d</string>
     <string name="collections_editor_tmdb_collection_fallback">Coleção TMDB %1$d</string>
+    <string name="enhanced_navigation_motion">Movimento de navegação</string>
+    <string name="enhanced_navigation_motion_description">Controla as transições entre telas. Outros efeitos mantêm suas configurações atuais.</string>
+    <string name="enhanced_motion_full">Completo</string>
+    <string name="enhanced_motion_reduced">Reduzido</string>
+    <string name="enhanced_motion_off">Desligado</string>
 </resources>

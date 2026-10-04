@@ -65,7 +65,7 @@ object NuvioMotion {
             instant = 0,
             quick = 125,
             fast = 180,
-            medium = 350,
+            medium = 240,
             slow = 450,
             overlay = 400,
             sidebarLabelIn = 125,

@@ -65,6 +65,7 @@ import com.nuvio.tv.LocaleCache
 import com.nuvio.tv.R
 import com.nuvio.tv.domain.model.AppIconOption
 import com.nuvio.tv.domain.model.AppTheme
+import com.nuvio.tv.domain.model.NavigationMotion
 import com.nuvio.tv.domain.model.CustomThemeColors
 import com.nuvio.tv.domain.model.SettingsUiStyle
 import com.nuvio.tv.ui.components.NuvioDialog
@@ -98,6 +99,7 @@ fun ThemeSettingsContent(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val appIconState by viewModel.appIconState.collectAsStateWithLifecycle()
     var showFontDialog by remember { mutableStateOf(false) }
+    var showMotionDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showAppIconDialog by remember { mutableStateOf(false) }
     var showCustomThemeDialog by remember(uiState.customThemeGradientEnabled) { mutableStateOf(false) }
@@ -308,6 +310,12 @@ fun ThemeSettingsContent(
                 subtitle = stringResource(R.string.appearance_font_and_language_subtitle)
             ) {
                 SettingsActionRow(
+                    title = stringResource(R.string.enhanced_navigation_motion),
+                    subtitle = stringResource(R.string.enhanced_navigation_motion_description),
+                    value = stringResource(uiState.navigationMotion.labelRes),
+                    onClick = { showMotionDialog = true }
+                )
+                SettingsActionRow(
                     title = stringResource(R.string.appearance_font),
                     subtitle = stringResource(R.string.appearance_font_subtitle),
                     value = uiState.selectedFont.displayName,
@@ -348,6 +356,21 @@ fun ThemeSettingsContent(
                 showFontDialog = false
             },
             onDismiss = { showFontDialog = false },
+            width = 400.dp,
+            maxHeight = 280.dp
+        )
+    }
+
+    if (showMotionDialog) {
+        SettingsSingleChoiceDialog(
+            title = stringResource(R.string.enhanced_navigation_motion),
+            options = NavigationMotion.entries.map { SettingsPickerOption(it, stringResource(it.labelRes)) },
+            selectedValue = uiState.navigationMotion,
+            onOptionSelected = {
+                viewModel.onEvent(ThemeSettingsEvent.SelectNavigationMotion(it))
+                showMotionDialog = false
+            },
+            onDismiss = { showMotionDialog = false },
             width = 400.dp,
             maxHeight = 280.dp
         )
@@ -589,3 +612,10 @@ private fun AppTheme.localizedName(): String = when (this) {
     AppTheme.ROSE -> stringResource(R.string.theme_color_rose)
     AppTheme.WHITE -> stringResource(R.string.theme_color_white)
 }
+
+private val NavigationMotion.labelRes: Int
+    get() = when (this) {
+        NavigationMotion.FULL -> R.string.enhanced_motion_full
+        NavigationMotion.REDUCED -> R.string.enhanced_motion_reduced
+        NavigationMotion.OFF -> R.string.enhanced_motion_off
+    }

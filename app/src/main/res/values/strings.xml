@@ -3365,4 +3365,9 @@
     <string name="autosync_toast_failed_no_reference">Sync failed: this video has no embedded subtitles to compare with.</string>
     <string name="autosync_toast_failed_unsupported">Sync failed: Auto Sync doesn\'t support this subtitle format.</string>
     <string name="autosync_label_synced">Auto synced</string>
+    <string name="enhanced_navigation_motion">Navigation motion</string>
+    <string name="enhanced_navigation_motion_description">Controls transitions between screens. Other effects keep their existing settings.</string>
+    <string name="enhanced_motion_full">Full</string>
+    <string name="enhanced_motion_reduced">Reduced</string>
+    <string name="enhanced_motion_off">Off</string>
 </resources>
