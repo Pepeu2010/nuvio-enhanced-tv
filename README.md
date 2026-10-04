@@ -6,13 +6,15 @@ Preservamos Kotlin, Jetpack Compose, TV Material 3, Media3, navegação, restaur
 
 ## Download
 
-[Baixar os APKs do Nuvio Enhanced](https://github.com/Pepeu2010/nuvio-enhanced/releases/tag/v0.1.0-alpha.1).
+[Baixar os APKs do Nuvio Enhanced](https://github.com/Pepeu2010/nuvio-enhanced/releases/tag/v0.1.0-alpha.2).
 
 - **APK universal:** use quando não souber a arquitetura; inclui ARM 32/64 bits, x86 e x86_64.
 - **APKs por arquitetura:** arquivos menores para arm64-v8a, armeabi-v7a, x86 e x86_64.
 - Fontes e checksums SHA-256 acompanham a pré-release.
 
-São builds **Full Debug de desenvolvimento** para Android TV, com ID `io.github.pepeu2010.nuvioenhanced.tv.debug`. Ainda não são pacotes otimizados de produção ou uma interface dedicada a celulares. A release contém a fundação 0-C, anterior ao incremento 1-A.1 de movimento de navegação em main.
+São builds **Full Debug de desenvolvimento** para Android TV, com ID `io.github.pepeu2010.nuvioenhanced.tv.debug`. Ainda não são pacotes otimizados de produção ou uma interface dedicada a celulares. A alpha.2 contém a fundação 0-C e o incremento 1-A.1 de movimento de navegação por perfil. A versão interna/versionCode ainda é herdada: instale substituindo o build de desenvolvimento anterior.
+
+O APK universal instalou em emulador 1080p e o seletor foi testado por D-pad, incluindo persistência após reinício. A imagem phone Android x86_64 de 16 KB exigiu modo de compatibilidade nativa; o QR de login falhou nesta sessão. Isto não valida Android TV OS, conta/sync/playback ou TV Box física. [Evidências e capturas](https://github.com/Pepeu2010/nuvio-enhanced/blob/main/docs/NATIVE_FOUNDATION.md).
 
 ## Melhorias e evolução
 
