@@ -725,6 +725,23 @@ class SearchViewModel @Inject constructor(
         query: String,
         generation: Long
     ) {
+        val aliases = if (catalog.apiType.lowercase() in setOf("series", "tv"))
+            com.nuvio.tv.core.catalog.brazilianSearchQueries(query) else listOf(query)
+        val aliasItems = mutableListOf<MetaPreview>()
+        var aliasRow: CatalogRow? = null
+        for (alias in aliases.drop(1)) {
+            val extra = catalogRepository.getCatalog(
+                addonBaseUrl = addon.baseUrl, addonId = addon.id, addonName = addon.displayName,
+                catalogId = catalog.id, catalogName = catalog.name, type = catalog.apiType,
+                skip = 0, skipStep = 0, extraArgs = mapOf("search" to alias), supportsSkip = false,
+                posterScreen = com.nuvio.tv.core.poster.CustomPosterScreen.SEARCH,
+            ).first { it !is NetworkResult.Loading }
+            if (!isCurrentSearch(generation, query)) return
+            if (extra is NetworkResult.Success) {
+                aliasItems += extra.data.items
+                if (aliasRow == null) aliasRow = extra.data
+            }
+        }
         val supportsSkip = catalog.supportsExtra("skip")
         val skipStep = catalog.skipStep()
         catalogRepository.getCatalog(
@@ -749,12 +766,23 @@ class SearchViewModel @Inject constructor(
                         type = catalog.apiType,
                         catalogId = catalog.id
                     )
-                    catalogsMap[key] = result.data
+                    catalogsMap[key] = result.data.copy(
+                        items = (result.data.items + aliasItems).distinctBy { it.apiType to it.id }
+                            .map { it.copy(name = com.nuvio.tv.core.catalog.brazilianTitle(it.id, it.apiType, it.name)) },
+                    )
                     pendingCatalogResponses = (pendingCatalogResponses - 1).coerceAtLeast(0)
                     scheduleCatalogRowsUpdate()
                 }
                 is NetworkResult.Error -> {
                     if (!isCurrentSearch(generation, query)) return@collect
+                    if (aliasItems.isNotEmpty()) {
+                        val key = catalogKey(addon.id, addon.baseUrl, catalog.apiType, catalog.id)
+                        catalogsMap[key] = requireNotNull(aliasRow).copy(
+                            items = aliasItems.distinctBy { it.apiType to it.id }.map {
+                                it.copy(name = com.nuvio.tv.core.catalog.brazilianTitle(it.id, it.apiType, it.name))
+                            }, hasMore = false, supportsSkip = false,
+                        )
+                    }
                     pendingCatalogResponses = (pendingCatalogResponses - 1).coerceAtLeast(0)
                     // Ignore per-catalog errors unless we have nothing to show.
                     if (catalogsMap.isEmpty()) {

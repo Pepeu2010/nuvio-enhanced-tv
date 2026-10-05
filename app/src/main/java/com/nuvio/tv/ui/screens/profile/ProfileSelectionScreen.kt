@@ -2070,7 +2070,11 @@ private fun ProfilePinOverlay(
     var isInputFocused by remember(state) { mutableStateOf(false) }
     var keyboardWasVisible by remember(state) { mutableStateOf(false) }
     val shakeOffset = remember(state) { androidx.compose.animation.core.Animatable(0f) }
-    val cursorAlpha by rememberInfiniteTransition(label = "pinCursor").animateFloat(
+    val motion = com.nuvio.tv.ui.theme.LocalUiMotion.current
+    val cursorTransition = if (isInputFocused && motion.allowsSpatialEffects) {
+        rememberInfiniteTransition(label = "pinCursor")
+    } else null
+    val cursorAlpha by cursorTransition?.animateFloat(
         initialValue = 0.25f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
@@ -2078,7 +2082,7 @@ private fun ProfilePinOverlay(
             repeatMode = RepeatMode.Reverse
         ),
         label = "pinCursorAlpha"
-    )
+    ) ?: remember { androidx.compose.runtime.mutableFloatStateOf(1f) }
     val resolvedErrorMessage = if (isSingleEntryMode) errorMessage else internalErrorMessage ?: errorMessage
     val isErrorState = !resolvedErrorMessage.isNullOrEmpty()
     val mismatchMessage = stringResource(R.string.profile_pin_overlay_mismatch)
@@ -2137,6 +2141,7 @@ private fun ProfilePinOverlay(
 
     suspend fun playErrorAnimation() {
         shakeOffset.snapTo(0f)
+        if (!motion.allowsSpatialEffects) return
         listOf(-22f, 18f, -14f, 10f, -6f, 0f).forEach { offset ->
             shakeOffset.animateTo(offset, animationSpec = tween(42))
         }

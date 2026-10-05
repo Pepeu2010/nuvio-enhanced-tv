@@ -10,6 +10,6 @@ class ForkIdentityTest {
     fun applicationAndUpdaterUseIndependentForkIdentity() {
         assertFalse(BuildConfig.APPLICATION_ID.startsWith("com.nuvio"))
         assertEquals("Pepeu2010", BuildConfig.GITHUB_OWNER)
-        assertEquals("nuvio-enhanced-tv", BuildConfig.GITHUB_REPO)
+        assertEquals("telumia-tv", BuildConfig.GITHUB_REPO)
     }
 }

@@ -90,7 +90,7 @@ val useLocalFfmpegDecoder = truthy(
 val releaseStoreFilePath = env("NUVIO_RELEASE_STORE_FILE")
     ?: localProperties.getProperty("NUVIO_RELEASE_STORE_FILE")
 val releaseKeyAliasValue = env("NUVIO_RELEASE_KEY_ALIAS")
-    ?: localProperties.getProperty("NUVIO_RELEASE_KEY_ALIAS", "nuvio-enhanced")
+    ?: localProperties.getProperty("NUVIO_RELEASE_KEY_ALIAS", "telumia")
 val releaseKeyPasswordValue = env("NUVIO_RELEASE_KEY_PASSWORD")
     ?: localProperties.getProperty("NUVIO_RELEASE_KEY_PASSWORD", "")
 val releaseStorePasswordValue = env("NUVIO_RELEASE_STORE_PASSWORD")
@@ -102,12 +102,12 @@ android {
     ndkVersion = "29.0.14206865"
 
     defaultConfig {
-        applicationId = "io.github.pepeu2010.nuvioenhanced.tv"
+        applicationId = "io.github.pepeu2010.telumia.tv"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1066
-        versionName = "1.1.0-beta.3"
+        versionCode = 2000
+        versionName = "0.2.0-alpha.1"
 
         buildConfigField("String", "PARENTAL_GUIDE_API_URL", "\"${localProperties.getProperty("PARENTAL_GUIDE_API_URL", "")}\"")
         buildConfigField("String", "INTRODB_API_URL", "\"${localProperties.getProperty("INTRODB_API_URL", "")}\"")
@@ -149,7 +149,7 @@ android {
 
         // In-app updater (GitHub Releases)
         buildConfigField("String", "GITHUB_OWNER", "\"Pepeu2010\"")
-        buildConfigField("String", "GITHUB_REPO", "\"nuvio-enhanced-tv\"")
+        buildConfigField("String", "GITHUB_REPO", "\"telumia-tv\"")
     }
 
     flavorDimensions += "distribution"
@@ -165,7 +165,7 @@ android {
         }
         create("playstore") {
             dimension = "distribution"
-            applicationId = "io.github.pepeu2010.nuvioenhanced.tv.playstore"
+            applicationId = "io.github.pepeu2010.telumia.tv.playstore"
             buildConfigField("boolean", "FEATURE_PLUGINS_ENABLED", "false")
             buildConfigField("boolean", "FEATURE_IN_APP_UPDATES_ENABLED", "false")
             buildConfigField("boolean", "FEATURE_IN_APP_TRAILERS_ENABLED", "false")
@@ -336,7 +336,7 @@ android {
 androidComponents {
     onVariants(selector().withBuildType("debug")) { variant ->
         val isPlaystore = variant.productFlavors.any { it.second == "playstore" }
-        variant.applicationId.set(if (isPlaystore) "io.github.pepeu2010.nuvioenhanced.tv.playstore.debug" else "io.github.pepeu2010.nuvioenhanced.tv.debug")
+        variant.applicationId.set(if (isPlaystore) "io.github.pepeu2010.telumia.tv.playstore.debug" else "io.github.pepeu2010.telumia.tv.debug")
     }
 }
 

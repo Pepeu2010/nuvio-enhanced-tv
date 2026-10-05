@@ -37,7 +37,7 @@ fun ClassicLayoutPreview(
     accentColor: Color = NuvioTheme.colors.Primary,
     animated: Boolean = true
 ) {
-    if (animated) {
+    if (animated && com.nuvio.tv.ui.theme.LocalUiMotion.current.allowsSpatialEffects) {
         AnimatedClassicLayoutPreview(modifier = modifier, accentColor = accentColor)
     } else {
         StaticClassicLayoutPreview(modifier = modifier, accentColor = accentColor)
@@ -150,7 +150,7 @@ fun GridLayoutPreview(
     accentColor: Color = NuvioTheme.colors.Primary,
     animated: Boolean = true
 ) {
-    if (animated) {
+    if (animated && com.nuvio.tv.ui.theme.LocalUiMotion.current.allowsSpatialEffects) {
         AnimatedGridLayoutPreview(modifier = modifier, accentColor = accentColor)
     } else {
         StaticGridLayoutPreview(modifier = modifier, accentColor = accentColor)
@@ -248,7 +248,7 @@ fun ModernLayoutPreview(
     accentColor: Color = NuvioTheme.colors.Primary,
     animated: Boolean = true
 ) {
-    if (animated) {
+    if (animated && com.nuvio.tv.ui.theme.LocalUiMotion.current.allowsSpatialEffects) {
         AnimatedModernLayoutPreview(modifier = modifier, accentColor = accentColor)
     } else {
         StaticModernLayoutPreview(modifier = modifier, accentColor = accentColor)

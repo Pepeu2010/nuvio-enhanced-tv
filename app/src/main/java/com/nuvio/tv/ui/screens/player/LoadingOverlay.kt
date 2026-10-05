@@ -62,23 +62,27 @@ fun LoadingOverlay(
     progress: Float? = null,
     modifier: Modifier = Modifier
 ) {
+    val motion = com.nuvio.tv.ui.theme.LocalUiMotion.current
     var logoLoadFailed by remember(logoUrl) { mutableStateOf(false) }
     val showLogo = !logoUrl.isNullOrBlank() && !logoLoadFailed
 
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(animationSpec = tween(250)),
-        exit = fadeOut(animationSpec = tween(200)),
+        enter = fadeIn(animationSpec = tween(motion.durationMillis(250))),
+        exit = fadeOut(animationSpec = tween(motion.durationMillis(200))),
         modifier = modifier
     ) {
         val context = LocalContext.current
         val logoAlpha by animateFloatAsState(
             targetValue = 1f,
-            animationSpec = tween(durationMillis = 700, delayMillis = 400, easing = LinearEasing),
+            animationSpec = tween(durationMillis = motion.durationMillis(700),
+                delayMillis = if (motion.allowsSpatialEffects) 400 else 0, easing = LinearEasing),
             label = "loadingLogoAlpha"
         )
-        val infiniteTransition = rememberInfiniteTransition(label = "loadingLogoPulse")
-        val logoScale by infiniteTransition.animateFloat(
+        val infiniteTransition = if (motion.allowsSpatialEffects) {
+            rememberInfiniteTransition(label = "loadingLogoPulse")
+        } else null
+        val logoScale by infiniteTransition?.animateFloat(
             initialValue = 1f,
             targetValue = 1.04f,
             animationSpec = infiniteRepeatable(
@@ -86,7 +90,7 @@ fun LoadingOverlay(
                 repeatMode = RepeatMode.Reverse
             ),
             label = "loadingLogoScale"
-        )
+        ) ?: remember { androidx.compose.runtime.mutableFloatStateOf(1f) }
         val backdropRequest = remember(context, backdropUrl) {
             backdropUrl?.takeIf { it.isNotBlank() }?.let { url ->
                 ImageRequest.Builder(context)

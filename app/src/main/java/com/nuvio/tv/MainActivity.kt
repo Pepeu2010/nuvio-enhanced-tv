@@ -4,7 +4,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.drawable.ColorDrawable
+import android.database.ContentObserver
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
 import android.util.Log
 import android.view.KeyEvent
 import android.widget.Toast
@@ -56,6 +60,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
@@ -98,6 +103,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.createLifecycleAwareWindowRecomposer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -334,6 +340,10 @@ open class MainActivity : ComponentActivity() {
 
     /** True until the first onResume after onCreate completes. */
     private var isFirstResumeAfterCreate = false
+    private val uiDurationScale = com.nuvio.tv.ui.theme.UiAnimationDurationScale(
+        initialMode = com.nuvio.tv.domain.model.NavigationMotion.OFF
+    )
+    private var motionSettingsObserver: ContentObserver? = null
 
     @OptIn(ExperimentalTvMaterial3Api::class, ExperimentalFoundationApi::class)
     override fun attachBaseContext(newBase: Context) {
@@ -384,7 +394,25 @@ open class MainActivity : ComponentActivity() {
         val launchEpisodeTitle = intent?.getStringExtra("episodeTitle")
         captureDeepLinkIntent(intent)
 
-        setContent {
+        uiDurationScale.systemScale = Settings.Global.getFloat(
+            contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f
+        )
+        motionSettingsObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                uiDurationScale.systemScale = Settings.Global.getFloat(
+                    contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f
+                )
+            }
+        }.also { observer ->
+            contentResolver.registerContentObserver(
+                Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE), false, observer
+            )
+        }
+        val uiRecomposer = window.decorView.createLifecycleAwareWindowRecomposer(
+            coroutineContext = uiDurationScale,
+            lifecycle = lifecycle
+        )
+        setContent(parent = uiRecomposer) {
             var hasSelectedProfileThisSession by rememberSaveable { mutableStateOf(false) }
             var startupSession by remember { mutableIntStateOf(0) }
             // Triggered immediately on profile click (before system confirms selection).
@@ -603,6 +631,7 @@ open class MainActivity : ComponentActivity() {
                     initialValue = com.nuvio.tv.domain.model.AnimationIntensity.STANDARD
                 )
             }
+            SideEffect { uiDurationScale.mode = navigationMotion }
             NuvioTheme(
                 appTheme = mainUiPrefs.theme,
                 customThemeColors = mainUiPrefs.customThemeColors,
@@ -610,7 +639,9 @@ open class MainActivity : ComponentActivity() {
                 amoledMode = mainUiPrefs.amoledMode,
                 amoledSurfacesMode = mainUiPrefs.amoledSurfacesMode,
                 settingsUiStyle = mainUiPrefs.settingsUiStyle,
-                navigationMotion = navigationMotion,
+                navigationMotion = if (uiDurationScale.effectiveSystemScale == 0f) {
+                    com.nuvio.tv.domain.model.NavigationMotion.OFF
+                } else navigationMotion,
                 animationIntensity = animationIntensity
             ) {
                 val defaultBringIntoViewSpec = LocalBringIntoViewSpec.current
@@ -1377,6 +1408,8 @@ open class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        motionSettingsObserver?.let { contentResolver.unregisterContentObserver(it) }
+        motionSettingsObserver = null
         super.onDestroy()
         PluginRuntimeHooks.onActivityDestroy()
     }

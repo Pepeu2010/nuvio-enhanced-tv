@@ -770,7 +770,7 @@ class MetaDetailsViewModel @Inject constructor(
             }
             val preferExternal = layoutPreferenceDataStore.preferExternalMetaAddonDetail.first()
 
-            if (preferExternal) {
+            if (preferExternal || com.nuvio.tv.core.catalog.isIludidaWork(metaLookupId)) {
                 // 1) Try meta addons first
                 metaRepository.getMetaFromAllAddons(type = itemType, id = metaLookupId).collect { result ->
                     when (result) {
@@ -1548,7 +1548,10 @@ class MetaDetailsViewModel @Inject constructor(
             ?: return meta
 
         val isSeries = meta.apiType in listOf("series", "tv")
-        val needsEpisodes = settings.useEpisodes && isSeries
+        val needsEpisodes = settings.useEpisodes && isSeries &&
+            !com.nuvio.tv.core.catalog.isIludidaInternationalCut(
+                meta.id, meta.videos.map { it.season to it.episode },
+            )
 
         // Fetch main enrichment and episode enrichment in parallel.
         val (enrichment, episodeMap) = coroutineScope {

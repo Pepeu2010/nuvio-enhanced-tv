@@ -1,6 +1,7 @@
 package com.nuvio.tv.data.repository
 
 import android.content.Context
+import com.nuvio.tv.core.network.NetworkResult
 import com.nuvio.tv.data.remote.api.AddonApi
 import com.nuvio.tv.data.remote.dto.MetaDto
 import com.nuvio.tv.data.remote.dto.MetaResponseDto
@@ -37,6 +38,51 @@ class MetaRepositoryPreferredAddonTypeTest {
 
     private val contentId = "tt0944947"
     private val baseUrl = "https://addon.example"
+
+    @Test
+    fun `Iludida prefers actual Brazilian addon episodes and preserves their stream IDs`() = runTest {
+        val id = "tt12879200"
+        val original = addon(listOf("series"), "https://original.example").copy(id = "original")
+        val brazil = addon(listOf("series"), "https://brazil.example").copy(id = "brazil")
+        val api = mockk<AddonApi>()
+        coEvery { api.getMeta(any()) } answers {
+            val local = firstArg<String>().startsWith(brazil.baseUrl)
+            Response.success(MetaResponseDto(meta = MetaDto(
+                id = id, type = "series", name = "Sadakatsiz",
+                videos = (1..if (local) 78 else 31).map { number ->
+                    com.nuvio.tv.data.remote.dto.VideoDto(
+                        id = if (local) "brazil:$id:1:$number" else "$id:1:$number",
+                        season = 1, episode = number,
+                    )
+                },
+            )))
+        }
+        val repository = newRepository(api, original, brazil)
+        repository.getMeta(original.baseUrl, "series", id).last()
+        val result = repository.getMetaFromAllAddons("series", id).last()
+        assertTrue(result is NetworkResult.Success)
+        val meta = (result as NetworkResult.Success).data
+        assertEquals("Iludida", meta.name)
+        assertEquals(78, meta.videos.size)
+        assertEquals("brazil:$id:1:78", meta.videos.last().id)
+        coVerify(exactly = 2) { api.getMeta("${original.baseUrl}/meta/series/$id.json") }
+        coVerify(exactly = 1) { api.getMeta("${brazil.baseUrl}/meta/series/$id.json") }
+    }
+
+    @Test
+    fun `Iludida keeps the available original edition when no Brazilian addon exists`() = runTest {
+        val id = "tt12879200"
+        val api = mockk<AddonApi>()
+        coEvery { api.getMeta(any()) } returns Response.success(MetaResponseDto(meta = MetaDto(
+            id = id, type = "series", name = "Sadakatsiz",
+            videos = (1..31).map { number -> com.nuvio.tv.data.remote.dto.VideoDto(
+                id = "$id:1:$number", season = 1, episode = number,
+            ) },
+        )))
+        val result = newRepository(api, addon(listOf("series")))
+            .getMetaFromAllAddons("series", id).last()
+        assertEquals(31, (result as NetworkResult.Success).data.videos.size)
+    }
 
     @Test
     fun `tv request to a series-only addon goes out as series`() = runTest {

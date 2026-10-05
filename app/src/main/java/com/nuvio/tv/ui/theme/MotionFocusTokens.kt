@@ -10,7 +10,27 @@ import androidx.compose.animation.core.TweenSpec
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.MotionDurationScale
 import com.nuvio.tv.domain.model.NavigationMotion
+
+/** Observable state lets suspended infinite transitions resume when motion is enabled again. */
+@Stable
+internal class UiAnimationDurationScale(
+    initialMode: NavigationMotion = NavigationMotion.FULL,
+    initialSystemScale: Float = 1f,
+) : MotionDurationScale {
+    var mode by mutableStateOf(initialMode)
+    var systemScale by mutableFloatStateOf(initialSystemScale)
+    val effectiveSystemScale: Float
+        get() = systemScale.takeIf { it.isFinite() && it >= 0f } ?: 1f
+    override val scaleFactor: Float
+        get() = if (mode == NavigationMotion.OFF) 0f else effectiveSystemScale
+}
 
 @Immutable
 data class NuvioMotionDurations(

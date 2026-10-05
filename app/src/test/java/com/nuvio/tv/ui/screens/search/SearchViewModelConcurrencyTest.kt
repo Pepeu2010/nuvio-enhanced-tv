@@ -45,6 +45,25 @@ class SearchViewModelConcurrencyTest {
 
     private val mainDispatcher = StandardTestDispatcher()
 
+    @Test
+    fun `Brazilian title queries original aliases through the installed catalog`() = runTest {
+        val addon = searchableAddon().let {
+            it.copy(types = listOf(ContentType.SERIES), rawTypes = listOf("series"),
+                catalogs = it.catalogs.map { catalog -> catalog.copy(type = ContentType.SERIES, rawType = "series") })
+        }
+        val gate = CompletableDeferred<Unit>().apply { complete(Unit) }
+        val catalogs = ImmediateCatalogRepository(addon, regionalFixture = true)
+        val viewModel = newViewModel(GatedAddonRepository(addon, gate), catalogs)
+        viewModel.onEvent(SearchEvent.QueryChanged("Iludida"))
+        advanceUntilIdle()
+        assertEquals(setOf("Iludida", "Sadakatsiz", "The Unfaithful", "A Woman Scorned"), catalogs.queries.toSet())
+        assertFalse(viewModel.uiState.value.isSearching)
+        val items = viewModel.uiState.value.catalogRows.single().items
+        assertEquals(1, items.size)
+        assertEquals("Iludida", items.single().name)
+        assertEquals("tt12879200", items.single().id)
+    }
+
     @Before
     fun setUp() {
         Dispatchers.setMain(mainDispatcher)
@@ -167,7 +186,8 @@ class SearchViewModelConcurrencyTest {
     }
 
     private class ImmediateCatalogRepository(
-        private val addon: Addon
+        private val addon: Addon,
+        private val regionalFixture: Boolean = false,
     ) : CatalogRepository {
         val queries = mutableListOf<String>()
 
@@ -187,6 +207,10 @@ class SearchViewModelConcurrencyTest {
             val query = extraArgs.getValue("search")
             queries += query
             emit(NetworkResult.Loading)
+            if (regionalFixture && query == "Iludida") {
+                emit(NetworkResult.Error("Catalog only recognizes the original title"))
+                return@flow
+            }
             emit(NetworkResult.Success(row(addon, query)))
         }
 
@@ -196,12 +220,12 @@ class SearchViewModelConcurrencyTest {
             addonBaseUrl = addon.baseUrl,
             catalogId = addon.catalogs.single().id,
             catalogName = addon.catalogs.single().name,
-            type = ContentType.MOVIE,
+            type = addon.catalogs.single().type,
             items = listOf(
                 MetaPreview(
-                    id = query,
-                    type = ContentType.MOVIE,
-                    name = query,
+                    id = if (regionalFixture) "tt12879200" else query,
+                    type = addon.catalogs.single().type,
+                    name = if (regionalFixture) "Sadakatsiz" else query,
                     poster = null,
                     posterShape = PosterShape.POSTER,
                     background = null,

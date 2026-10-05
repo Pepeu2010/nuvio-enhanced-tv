@@ -225,7 +225,11 @@ class MetaRepositoryImpl @Inject constructor(
     ): Flow<NetworkResult<Meta>> = flow {
         val cacheKey = metaLookupCacheKey(type, id)
         addonMetaCache[cacheKey]?.let { cached ->
-            if (!cached.isExpired()) {
+            if (!cached.isExpired() &&
+                (!com.nuvio.tv.core.catalog.isIludidaWork(id) ||
+                    com.nuvio.tv.core.catalog.hasIludidaBrazilianSeason(
+                        cached.meta.id, cached.meta.videos.map { it.season to it.episode },
+                    ))) {
                 emit(NetworkResult.Success(cached.meta))
                 return@flow
             }
@@ -379,13 +383,14 @@ class MetaRepositoryImpl @Inject constructor(
                     // Normalize source addon URL for comparison so we can detect
                     // when the candidate is the same addon that served the catalog.
                     val normalizedSourceUrl = sourceAddonBaseUrl?.let(::normalizedAddonKey)
+                    var originalEdition: Meta? = null
 
                     for ((addon, candidateType) in prioritizedCandidates) {
                         // If this candidate is the same addon that provided the catalog
                         // data for this item, the item already carries its meta —
                         // return immediately without making a request and without
                         // trying further addons.
-                        if (normalizedSourceUrl != null) {
+                        if (normalizedSourceUrl != null && !com.nuvio.tv.core.catalog.isIludidaWork(id)) {
                             if (normalizedAddonKey(addon.baseUrl) == normalizedSourceUrl) {
                                 Log.d(TAG, "Source addon matched, catalog meta is sufficient addon=${addon.name} type=$candidateType id=$id")
                                 return@async MetaLookupResult.SourceSufficient
@@ -401,7 +406,16 @@ class MetaRepositoryImpl @Inject constructor(
                             if (response.isSuccessful) {
                                 val metaDto = response.body()?.meta
                                 if (metaDto != null) {
-                                    val meta = metaDto.toDomain(context.getString(R.string.episodes_episode))
+                                    val meta = metaDto.toDomain(context.getString(R.string.episodes_episode)).let {
+                                        it.copy(name = com.nuvio.tv.core.catalog.brazilianTitle(it.id, it.apiType, it.name))
+                                    }
+                                    if (com.nuvio.tv.core.catalog.isIludidaWork(meta.id) &&
+                                        !com.nuvio.tv.core.catalog.hasIludidaBrazilianSeason(
+                                            meta.id, meta.videos.map { it.season to it.episode },
+                                        )) {
+                                        if (originalEdition == null) originalEdition = meta
+                                        continue
+                                    }
                                     val ttlMs = parseMaxAgeMs(response.headers()["Cache-Control"])
                                     val cached = CachedMeta(meta, System.currentTimeMillis() + ttlMs)
                                     addonMetaCache[cacheKey] = cached
@@ -431,6 +445,10 @@ class MetaRepositoryImpl @Inject constructor(
                             allMissing = false
                             /* try next */
                         }
+                    }
+                    originalEdition?.let { original ->
+                        addonMetaCache[cacheKey] = CachedMeta(original, System.currentTimeMillis() + 60_000L)
+                        return@async MetaLookupResult.Found(original)
                     }
                     // Comparing against the candidate list makes "every candidate was attempted"
                     // explicit rather than implied by the loop never breaking early.

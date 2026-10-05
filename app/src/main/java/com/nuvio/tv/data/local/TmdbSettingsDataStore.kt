@@ -53,7 +53,7 @@ class TmdbSettingsDataStore @Inject constructor(
                 enabled = prefs[enabledKey] ?: false,
                 modernHomeEnabled = prefs[modernHomeEnabledKey] ?: false,
                 enrichContinueWatching = prefs[enrichContinueWatchingKey] ?: true,
-                language = prefs[languageKey] ?: "en",
+                language = prefs[languageKey] ?: "pt-BR",
                 useArtwork = prefs[useArtworkKey] ?: true,
                 useBasicInfo = prefs[useBasicInfoKey] ?: true,
                 useDetails = prefs[useDetailsKey] ?: true,
@@ -81,7 +81,7 @@ class TmdbSettingsDataStore @Inject constructor(
     }
 
     suspend fun setLanguage(language: String) {
-        store().edit { it[languageKey] = language.ifBlank { "en" } }
+        store().edit { it[languageKey] = language.ifBlank { "pt-BR" } }
     }
 
     suspend fun setUseArtwork(enabled: Boolean) {

@@ -1227,8 +1227,10 @@ private fun SearchInputField(
             val themeAccent = NuvioTheme.colors.Secondary
 
             // Pulsating animation (constant rhythm while listening)
-            val pulseTransition = rememberInfiniteTransition(label = "voicePulse")
-            val pulseScale by pulseTransition.animateFloat(
+            val pulseTransition = if (com.nuvio.tv.ui.theme.LocalUiMotion.current.allowsSpatialEffects) {
+                rememberInfiniteTransition(label = "voicePulse")
+            } else null
+            val pulseScale by pulseTransition?.animateFloat(
                 initialValue = 1f,
                 targetValue = 1.35f,
                 animationSpec = infiniteRepeatable(
@@ -1236,8 +1238,8 @@ private fun SearchInputField(
                     repeatMode = RepeatMode.Restart
                 ),
                 label = "pulseScale"
-            )
-            val pulseAlpha by pulseTransition.animateFloat(
+            ) ?: remember { androidx.compose.runtime.mutableFloatStateOf(1f) }
+            val pulseAlpha by pulseTransition?.animateFloat(
                 initialValue = 0.5f,
                 targetValue = 0f,
                 animationSpec = infiniteRepeatable(
@@ -1245,7 +1247,7 @@ private fun SearchInputField(
                     repeatMode = RepeatMode.Restart
                 ),
                 label = "pulseAlpha"
-            )
+            ) ?: remember { androidx.compose.runtime.mutableFloatStateOf(0.5f) }
 
             // RMS-based ring — smoothly follows mic input level
             val animatedRms by animateFloatAsState(

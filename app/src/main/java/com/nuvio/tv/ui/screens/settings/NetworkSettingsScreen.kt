@@ -850,8 +850,10 @@ private fun NetworkMetricCard(
     value: String?,
     loading: Boolean
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "spin")
-    val rotation by infiniteTransition.animateFloat(
+    val infiniteTransition = if (loading && com.nuvio.tv.ui.theme.LocalUiMotion.current.allowsSpatialEffects) {
+        rememberInfiniteTransition(label = "spin")
+    } else null
+    val rotation by infiniteTransition?.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
@@ -859,7 +861,7 @@ private fun NetworkMetricCard(
             repeatMode = RepeatMode.Restart
         ),
         label = "rotation"
-    )
+    ) ?: remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
 
     Column(
         modifier = modifier.padding(NuvioTheme.spacing.sm),
