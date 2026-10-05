@@ -20,10 +20,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -193,11 +195,26 @@ internal fun LayoutSidebarSection(
     uiState: LayoutSettingsUiState,
     onEvent: (LayoutSettingsEvent) -> Unit
 ) {
+    val sidebarToggleFocusRequester = remember { FocusRequester() }
+    var pendingSidebarFocus by remember { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(uiState.modernSidebarEnabled, pendingSidebarFocus) {
+        if (pendingSidebarFocus != null && pendingSidebarFocus == uiState.modernSidebarEnabled) {
+            // The destination survives relocation, but its old parent clears active focus.
+            withFrameNanos { }
+            sidebarToggleFocusRequester.requestFocus()
+            pendingSidebarFocus = null
+        }
+    }
     SettingsToggleRow(
         title = stringResource(R.string.layout_modern_sidebar),
         subtitle = stringResource(R.string.layout_modern_sidebar_sub),
         checked = uiState.modernSidebarEnabled,
-        onToggle = { onEvent(LayoutSettingsEvent.SetModernSidebarEnabled(!uiState.modernSidebarEnabled)) }
+        onToggle = {
+            val enabled = !uiState.modernSidebarEnabled
+            pendingSidebarFocus = enabled
+            onEvent(LayoutSettingsEvent.SetModernSidebarEnabled(enabled))
+        },
+        modifier = Modifier.focusRequester(sidebarToggleFocusRequester)
     )
     if (uiState.modernSidebarEnabled) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {

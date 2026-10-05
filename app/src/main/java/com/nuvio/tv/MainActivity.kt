@@ -64,7 +64,9 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -864,6 +866,23 @@ open class MainActivity : ComponentActivity() {
                         else -> Screen.LayoutSelection.route
                     }
                     val navController = rememberNavController()
+                    val latestStartDestination by rememberUpdatedState(startDestination)
+                    // Preserve registration order: destination Back handlers keep priority.
+                    val sidebarBackHandler = remember {
+                        movableContentOf<Boolean, () -> Unit> { enabled, onBack ->
+                            BackHandler(enabled = enabled, onBack = onBack)
+                        }
+                    }
+                    // Keep destination composition and focus when switching sidebar layouts.
+                    val navigationContent = remember(navController) {
+                        movableContentOf<Boolean> { hideHeaders ->
+                            NuvioNavHost(
+                                navController = navController,
+                                startDestination = latestStartDestination,
+                                hideBuiltInHeaders = hideHeaders
+                            )
+                        }
+                    }
                     var optimisticRoute by remember { mutableStateOf<String?>(null) }
                     val navBackStackEntry by navController.currentBackStackEntryAsState()
                     val actualRoute = navBackStackEntry?.destination?.route
@@ -1157,7 +1176,8 @@ open class MainActivity : ComponentActivity() {
                                 ModernSidebarScaffold(
                                     longPressBackHeld = longPressBackHeld,
                                     navController = navController,
-                                    startDestination = startDestination,
+                                    navigationContent = navigationContent,
+                                    sidebarBackHandler = sidebarBackHandler,
                                     currentRoute = currentRoute,
                                     rootRoutes = rootRoutes,
                                     drawerItems = drawerItems,
@@ -1178,7 +1198,8 @@ open class MainActivity : ComponentActivity() {
                                 LegacySidebarScaffold(
                                     longPressBackHeld = longPressBackHeld,
                                     navController = navController,
-                                    startDestination = startDestination,
+                                    navigationContent = navigationContent,
+                                    sidebarBackHandler = sidebarBackHandler,
                                     currentRoute = currentRoute,
                                     rootRoutes = rootRoutes,
                                     drawerItems = drawerItems,
@@ -1387,7 +1408,8 @@ private fun SidebarFocusRecoveryEffect(
 private fun LegacySidebarScaffold(
     longPressBackHeld: MutableState<Boolean>,
     navController: NavHostController,
-    startDestination: String,
+    navigationContent: @Composable (Boolean) -> Unit,
+    sidebarBackHandler: @Composable (Boolean, () -> Unit) -> Unit,
     currentRoute: String?,
     rootRoutes: Set<String>,
     drawerItems: List<DrawerItem>,
@@ -1429,14 +1451,13 @@ private fun LegacySidebarScaffold(
     var legacyDrawerInteractionVersion by remember { mutableStateOf(0) }
 
 
-    BackHandler(enabled = currentRoute in rootRoutes && drawerState.currentValue == DrawerValue.Closed) {
-        pendingSidebarFocusRequest = true
-        drawerState.setValue(DrawerValue.Open)
-    }
-
-    BackHandler(enabled = currentRoute in rootRoutes && drawerState.currentValue == DrawerValue.Open) {
-        if (longPressBackHeld.value) return@BackHandler
-        onExitApp()
+    sidebarBackHandler(currentRoute in rootRoutes) {
+        if (drawerState.currentValue == DrawerValue.Closed) {
+            pendingSidebarFocusRequest = true
+            drawerState.setValue(DrawerValue.Open)
+        } else if (!longPressBackHeld.value) {
+            onExitApp()
+        }
     }
 
     LaunchedEffect(drawerState.currentValue, pendingContentFocusTransfer) {
@@ -1603,6 +1624,14 @@ private fun LegacySidebarScaffold(
                         }
                     }
                 }
+                    if (isExpanded && showProfileSelector && activeProfileName.isNotEmpty() &&
+                        androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp >= 420
+                    ) {
+                        BrandWordmark(
+                            contentDescription = stringResource(R.string.cd_nuvio_logo),
+                            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp).height(32.dp),
+                        )
+                    }
             }
         }
         }
@@ -1669,11 +1698,7 @@ private fun LegacySidebarScaffold(
                 LocalSidebarExpanded provides (drawerState.currentValue == DrawerValue.Open),
                 LocalContentFocusRequester provides contentFocusRequester
             ) {
-                NuvioNavHost(
-                    navController = navController,
-                    startDestination = startDestination,
-                    hideBuiltInHeaders = hideBuiltInHeaders
-                )
+                navigationContent(hideBuiltInHeaders)
             }
         }
     }
@@ -1787,7 +1812,8 @@ private fun LegacySidebarButton(
 private fun ModernSidebarScaffold(
     longPressBackHeld: MutableState<Boolean>,
     navController: NavHostController,
-    startDestination: String,
+    navigationContent: @Composable (Boolean) -> Unit,
+    sidebarBackHandler: @Composable (Boolean, () -> Unit) -> Unit,
     currentRoute: String?,
     rootRoutes: Set<String>,
     drawerItems: List<DrawerItem>,
@@ -1861,15 +1887,14 @@ private fun ModernSidebarScaffold(
         }
     }
 
-    BackHandler(enabled = currentRoute in rootRoutes && !isSidebarExpanded && !sidebarCollapsePending) {
-        isSidebarExpanded = true
-        sidebarCollapsePending = false
-        pendingSidebarFocusRequest = true
-    }
-
-    BackHandler(enabled = currentRoute in rootRoutes && isSidebarExpanded && !sidebarCollapsePending) {
-        if (longPressBackHeld.value) return@BackHandler
-        onExitApp()
+    sidebarBackHandler(currentRoute in rootRoutes && !sidebarCollapsePending) {
+        if (!isSidebarExpanded) {
+            isSidebarExpanded = true
+            sidebarCollapsePending = false
+            pendingSidebarFocusRequest = true
+        } else if (!longPressBackHeld.value) {
+            onExitApp()
+        }
     }
 
     LaunchedEffect(sidebarCollapsePending, isSidebarExpanded, showSidebar) {
@@ -2070,11 +2095,7 @@ private fun ModernSidebarScaffold(
                 LocalSidebarExpanded provides isSidebarExpanded,
                 LocalContentFocusRequester provides contentFocusRequester
             ) {
-                NuvioNavHost(
-                    navController = navController,
-                    startDestination = startDestination,
-                    hideBuiltInHeaders = hideBuiltInHeaders
-                )
+                navigationContent(hideBuiltInHeaders)
             }
         }
 

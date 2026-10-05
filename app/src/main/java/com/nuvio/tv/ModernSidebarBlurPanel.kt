@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Card
@@ -90,6 +91,9 @@ internal fun ModernSidebarBlurPanel(
     showProfileSelector: Boolean,
     onSwitchProfile: () -> Unit
 ) {
+    val motionPolicy = com.nuvio.tv.ui.theme.LocalUiMotion.current
+    val showSignature = showProfileSelector && activeProfileName.isNotEmpty() &&
+        LocalConfiguration.current.screenHeightDp >= 420
     val delayedBlurProgress =
         ((sidebarExpandProgress - 0.34f) / 0.66f).coerceIn(0f, 1f)
     val showPanelBlur = blurEnabled &&
@@ -111,7 +115,7 @@ internal fun ModernSidebarBlurPanel(
     val borderBase = colors.Border
     val isAmoledBlack = bgElevated == Color.Black
     val panelBackgroundBrush = remember(blurEnabled, isAmoledBlack, bgElevated, bgCard) {
-        val baseColor = if (isAmoledBlack) Color.Black else Color(0xFF161618)
+        val baseColor = if (isAmoledBlack) Color.Black else bgElevated
         val alpha = when {
             blurEnabled -> 0.65f
             isAmoledBlack -> 1f
@@ -132,7 +136,7 @@ internal fun ModernSidebarBlurPanel(
             .graphicsLayer {
                 val p = sidebarExpandProgress
                 alpha = p
-                val s = 0.97f + (0.03f * p)
+                val s = if (motionPolicy.allowsSpatialEffects) motionPolicy.scale(0.97f + (0.03f * p)) else 1f
                 scaleX = s
                 scaleY = s
                 transformOrigin = TransformOrigin(0f, 0f)
@@ -222,6 +226,13 @@ internal fun ModernSidebarBlurPanel(
                     }
                 }
             }
+        }
+        if (showSignature) {
+            BrandWordmark(
+                contentDescription = stringResource(R.string.cd_nuvio_logo),
+                modifier = Modifier.align(Alignment.CenterHorizontally).height(32.dp),
+                alpha = sidebarLabelAlpha,
+            )
         }
     }
 }
