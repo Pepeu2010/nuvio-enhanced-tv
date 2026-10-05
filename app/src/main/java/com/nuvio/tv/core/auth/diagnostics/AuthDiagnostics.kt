@@ -411,10 +411,45 @@ fun authDiagnosticFilteredHeaders(headers: Map<String, String>): Map<String, Str
 fun authDiagnosticFilteredBody(body: String?): String? {
     if (body == null) return null
     if (body.isBlank()) return body
+    if (body == EXCLUDED_CREDENTIAL) return body
     val parsed = runCatching { authDiagnosticsJson.parseToJsonElement(body) }.getOrNull()
     if (parsed is JsonObject || parsed is JsonArray) return filterJsonElement(parsed).toString()
     return EXCLUDED_CREDENTIAL
 }
+
+// Apply at the persistence/upload boundary as well, including reports queued
+// by an older build. Legacy stack traces and raw logs cannot be safely parsed.
+internal fun AuthDiagnosticReportRequestDto.redactedForDiagnostics(): AuthDiagnosticReportRequestDto = copy(
+    environment = environment.copy(
+        supabaseUrl = environment.supabaseUrl.urlForLog(),
+        tvLoginWebBaseUrl = environment.tvLoginWebBaseUrl.urlForLog(),
+    ),
+    terminal = terminal.copy(reason = EXCLUDED_CREDENTIAL),
+    timeline = timeline.map { event ->
+        event.copy(
+            url = event.url?.urlForLog(),
+            request = event.request?.let { request -> request.copy(
+                headers = authDiagnosticFilteredHeaders(request.headers),
+                body = authDiagnosticFilteredBody(request.body),
+            ) },
+            response = event.response?.let { response -> response.copy(
+                headers = authDiagnosticFilteredHeaders(response.headers),
+                body = authDiagnosticFilteredBody(response.body),
+            ) },
+            network = event.network?.copy(message = EXCLUDED_CREDENTIAL, proxy = null),
+            detail = event.detail?.mapValues { EXCLUDED_CREDENTIAL },
+            exception = event.exception?.withoutLegacyMessages(),
+        )
+    },
+    exceptions = exceptions.map { it.withoutLegacyMessages() },
+    rawLogs = rawLogs.map { EXCLUDED_CREDENTIAL },
+)
+
+private fun AuthDiagnosticExceptionDto.withoutLegacyMessages(): AuthDiagnosticExceptionDto = copy(
+    message = EXCLUDED_CREDENTIAL,
+    causeChain = emptyList(),
+    stackTrace = EXCLUDED_CREDENTIAL,
+)
 
 fun authNetworkErrorFamily(error: Throwable?): String? {
     if (error == null) return null

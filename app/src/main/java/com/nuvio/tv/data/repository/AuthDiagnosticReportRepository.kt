@@ -2,6 +2,7 @@ package com.nuvio.tv.data.repository
 
 import android.content.Context
 import com.nuvio.tv.BuildConfig
+import com.nuvio.tv.core.auth.diagnostics.redactedForDiagnostics
 import com.nuvio.tv.data.remote.api.AuthDiagnosticReportApi
 import com.nuvio.tv.data.remote.dto.AuthDiagnosticReportRequestDto
 import com.squareup.moshi.Moshi
@@ -60,7 +61,7 @@ class AuthDiagnosticReportRepository @Inject constructor(
         if (BuildConfig.PLAYBACK_REPORTS_BASE_URL.isBlank()) {
             error("Auth diagnostics endpoint is not configured")
         }
-        val response = authDiagnosticReportApi.createAuthDiagnosticReport(report)
+        val response = authDiagnosticReportApi.createAuthDiagnosticReport(report.redactedForDiagnostics())
         if (!response.isSuccessful) {
             error("Auth diagnostics upload failed: HTTP ${response.code()}")
         }
@@ -88,17 +89,21 @@ class AuthDiagnosticReportQueue(
 
     suspend fun read(): List<AuthDiagnosticReportRequestDto> = withContext(Dispatchers.IO) {
         if (!queueFile.exists()) return@withContext emptyList()
-        queueFile.readLines()
+        val lines = queueFile.readLines()
             .asSequence()
             .map { it.trim() }
             .filter { it.isNotBlank() }
-            .mapNotNull { line -> runCatching { adapter.fromJson(line) }.getOrNull() }
             .toList()
+        val parsed = lines
+            .mapNotNull { line -> runCatching { adapter.fromJson(line) }.getOrNull() }
+        val redacted = parsed.map { it.redactedForDiagnostics() }
+        if (parsed != redacted || parsed.size != lines.size) write(redacted)
+        redacted
     }
 
     suspend fun write(reports: List<AuthDiagnosticReportRequestDto>) {
         withContext(Dispatchers.IO) {
-            val bounded = reports.takeLast(maxReports)
+            val bounded = reports.takeLast(maxReports).map { it.redactedForDiagnostics() }
             if (bounded.isEmpty()) {
                 if (queueFile.exists()) queueFile.delete()
                 return@withContext
