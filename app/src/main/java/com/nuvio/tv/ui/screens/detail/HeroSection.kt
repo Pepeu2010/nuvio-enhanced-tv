@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -76,6 +77,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.graphics.painter.Painter
 import coil3.request.ImageRequest
 import coil3.request.crossfade
@@ -123,6 +125,9 @@ fun HeroContentSection(
     onTruncationChanged: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
+    val isMovie = meta.apiType.equals("movie", ignoreCase = true)
+    val viewportHeight = LocalConfiguration.current.screenHeightDp
+    val heroMinimumHeight = if (isMovie) (viewportHeight * 0.82f).coerceAtLeast(360f).dp else 540.dp
     val isSeriesApi = remember(meta.apiType) {
         meta.apiType.equals("series", ignoreCase = true) || meta.apiType.equals("tv", ignoreCase = true)
     }
@@ -187,7 +192,7 @@ fun HeroContentSection(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(540.dp),
+            .then(if (isMovie) Modifier.heightIn(min = heroMinimumHeight) else Modifier.height(540.dp)),
         verticalArrangement = Arrangement.Bottom
     ) {
         Column(
@@ -196,9 +201,18 @@ fun HeroContentSection(
                 .animateContentSize(
                     animationSpec = tween(600)
                 )
-                .padding(start = NuvioTheme.spacing.xxxl, end = NuvioTheme.spacing.xxxl, bottom = NuvioTheme.spacing.lg),
+                .padding(start = NuvioTheme.spacing.xxxl, end = NuvioTheme.spacing.xxxl,
+                    top = if (isMovie) 56.dp else 0.dp, bottom = NuvioTheme.spacing.lg),
             verticalArrangement = Arrangement.Bottom
         ) {
+            if (isMovie && !isTrailerPlaying) {
+                Text(
+                    text = stringResource(R.string.type_movie).uppercase(Locale.getDefault()),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = NuvioTheme.extendedColors.textSecondary,
+                    modifier = Modifier.padding(bottom = NuvioTheme.spacing.sm),
+                )
+            }
             // Logo/Title — always visible during trailer, animates size
             if (shouldShowLogo) {
                 AsyncImage(
@@ -223,6 +237,8 @@ fun HeroContentSection(
                         text = meta.name,
                         style = MaterialTheme.typography.displayMedium,
                         color = NuvioTheme.colors.TextPrimary,
+                        maxLines = if (isMovie) 2 else Int.MAX_VALUE,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(bottom = NuvioTheme.spacing.sm)
                     )
                 }
@@ -250,6 +266,11 @@ fun HeroContentSection(
                 modifier = Modifier.alpha(heroActionsAlpha)
             ) {
                 Column {
+                    if (isMovie) {
+                        MetaInfoRow(meta = meta, hideImdbRating = hideMetaInfoImdb,
+                            showFullReleaseDate = showFullReleaseDate, tmdbRating = tmdbRating)
+                        Spacer(modifier = Modifier.height(NuvioTheme.spacing.lg))
+                    }
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.md),
                         verticalAlignment = Alignment.CenterVertically
@@ -302,7 +323,22 @@ fun HeroContentSection(
                         }
 
                         if (trailerAvailable) {
-                            ActionIconButtonPainter(
+                            if (isMovie) {
+                                Button(
+                                    onClick = onTrailerClick,
+                                    modifier = Modifier.onFocusChanged {
+                                        if (it.isFocused) onHeroActionFocused()
+                                    }.focusProperties { up = FocusRequester.Cancel },
+                                    shape = ButtonDefaults.shape(shape = RoundedCornerShape(16.dp)),
+                                    border = ButtonDefaults.border(focusedBorder = Border(
+                                        border = NuvioTheme.focusRing.border(NuvioTheme.spacing.xxs),
+                                        shape = RoundedCornerShape(16.dp))),
+                                ) {
+                                    Icon(painter = trailerPainter, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(NuvioTheme.spacing.sm))
+                                    Text(stringResource(R.string.hero_play_trailer), style = MaterialTheme.typography.labelLarge)
+                                }
+                            } else ActionIconButtonPainter(
                                 painter = trailerPainter,
                                 contentDescription = stringResource(R.string.hero_play_trailer),
                                 onClick = onTrailerClick,
@@ -346,6 +382,7 @@ fun HeroContentSection(
                     meta.description?.let { description ->
                         SynopsisDescription(
                             description = description,
+                            maxLines = if (isMovie) 3 else 8,
                             onShowFullDescription = onShowFullDescription,
                             upFocusRequester = playButtonFocusRequester,
                             onFocused = onHeroActionFocused,
@@ -356,7 +393,7 @@ fun HeroContentSection(
                         )
                     }
 
-                    MetaInfoRow(
+                    if (!isMovie) MetaInfoRow(
                         meta = meta,
                         hideImdbRating = hideMetaInfoImdb,
                         showFullReleaseDate = showFullReleaseDate,
