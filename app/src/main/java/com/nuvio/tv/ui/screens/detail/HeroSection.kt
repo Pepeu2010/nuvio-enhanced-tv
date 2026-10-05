@@ -127,6 +127,7 @@ fun HeroContentSection(
     val context = LocalContext.current
     val isMovie = meta.apiType.equals("movie", ignoreCase = true)
     val viewportHeight = LocalConfiguration.current.screenHeightDp
+    val compactMovieHero = isMovie && viewportHeight < 480
     val heroMinimumHeight = if (isMovie) (viewportHeight * 0.82f).coerceAtLeast(360f).dp else 540.dp
     val isSeriesApi = remember(meta.apiType) {
         meta.apiType.equals("series", ignoreCase = true) || meta.apiType.equals("tv", ignoreCase = true)
@@ -169,7 +170,7 @@ fun HeroContentSection(
 
     // Animate logo properties for trailer mode
     val logoHeight by animateDpAsState(
-        targetValue = if (isTrailerPlaying) 60.dp else 100.dp,
+        targetValue = if (isTrailerPlaying) 60.dp else if (compactMovieHero) 64.dp else 100.dp,
         animationSpec = tween(600),
         label = "logoHeight"
     )
@@ -202,7 +203,8 @@ fun HeroContentSection(
                     animationSpec = tween(600)
                 )
                 .padding(start = NuvioTheme.spacing.xxxl, end = NuvioTheme.spacing.xxxl,
-                    top = if (isMovie) 56.dp else 0.dp, bottom = NuvioTheme.spacing.lg),
+                    top = if (compactMovieHero) 16.dp else if (isMovie) 56.dp else 0.dp,
+                    bottom = NuvioTheme.spacing.lg),
             verticalArrangement = Arrangement.Bottom
         ) {
             if (isMovie && !isTrailerPlaying) {
@@ -235,7 +237,7 @@ fun HeroContentSection(
                 ) {
                     Text(
                         text = meta.name,
-                        style = MaterialTheme.typography.displayMedium,
+                        style = if (compactMovieHero) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.displayMedium,
                         color = NuvioTheme.colors.TextPrimary,
                         maxLines = if (isMovie) 2 else Int.MAX_VALUE,
                         overflow = TextOverflow.Ellipsis,
@@ -382,7 +384,7 @@ fun HeroContentSection(
                     meta.description?.let { description ->
                         SynopsisDescription(
                             description = description,
-                            maxLines = if (isMovie) 3 else 8,
+                            maxLines = if (compactMovieHero) 2 else if (isMovie) 3 else 8,
                             onShowFullDescription = onShowFullDescription,
                             upFocusRequester = playButtonFocusRequester,
                             onFocused = onHeroActionFocused,

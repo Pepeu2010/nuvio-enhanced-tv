@@ -62,6 +62,7 @@ class CinematicMovieHeroTvTest {
     @Test fun longSynopsisOpensThroughDpadWithoutActivatingPlayback() {
         var synopsis=0; var play=0
         setContent(onSynopsis={synopsis++}, onPlay={play++})
+        compose.onNodeWithText(instrumentation.targetContext.getString(R.string.hero_synopsis_read_more)).assertIsDisplayed()
         instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN)
         instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
         compose.runOnIdle { assertEquals(1, synopsis); assertEquals(0, play) }
