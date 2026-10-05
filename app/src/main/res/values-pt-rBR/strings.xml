@@ -3182,4 +3182,9 @@
     <string name="enhanced_motion_full">Completo</string>
     <string name="enhanced_motion_reduced">Reduzido</string>
     <string name="enhanced_motion_off">Desligado</string>
+    <string name="enhanced_animation_intensity">Intensidade de animação</string>
+    <string name="enhanced_animation_intensity_description">Ajusta velocidade e intensidade no modo Completo. Reduzido e Desligado têm prioridade.</string>
+    <string name="enhanced_intensity_subtle">Sutil</string>
+    <string name="enhanced_intensity_standard">Padrão</string>
+    <string name="enhanced_intensity_cinematic">Cinemática</string>
 </resources>

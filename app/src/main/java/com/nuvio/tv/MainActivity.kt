@@ -184,7 +184,7 @@ import com.nuvio.tv.ui.screens.profile.ProfileSelectionScreen
 import com.nuvio.tv.ui.theme.NuvioComponents
 import com.nuvio.tv.ui.theme.NuvioLayout
 import com.nuvio.tv.ui.theme.NuvioMotion
-import com.nuvio.tv.ui.theme.LocalNavigationMotion
+import com.nuvio.tv.ui.theme.LocalUiMotion
 import com.nuvio.tv.ui.theme.NuvioPrimitives
 import com.nuvio.tv.ui.theme.NuvioRadii
 import com.nuvio.tv.ui.theme.NuvioStrokes
@@ -596,6 +596,11 @@ open class MainActivity : ComponentActivity() {
                     initialValue = com.nuvio.tv.domain.model.NavigationMotion.OFF
                 )
             }
+            val animationIntensity by key(activeProfileId, startupSession) {
+                themeDataStore.animationIntensity.collectAsStateWithLifecycle(
+                    initialValue = com.nuvio.tv.domain.model.AnimationIntensity.STANDARD
+                )
+            }
             NuvioTheme(
                 appTheme = mainUiPrefs.theme,
                 customThemeColors = mainUiPrefs.customThemeColors,
@@ -603,7 +608,8 @@ open class MainActivity : ComponentActivity() {
                 amoledMode = mainUiPrefs.amoledMode,
                 amoledSurfacesMode = mainUiPrefs.amoledSurfacesMode,
                 settingsUiStyle = mainUiPrefs.settingsUiStyle,
-                navigationMotion = navigationMotion
+                navigationMotion = navigationMotion,
+                animationIntensity = animationIntensity
             ) {
                 val defaultBringIntoViewSpec = LocalBringIntoViewSpec.current
                 val bringIntoViewSpec = if (mainUiPrefs.smoothBringIntoViewEnabled) {
@@ -1396,7 +1402,7 @@ private fun LegacySidebarScaffold(
     onNavigate: (String) -> Unit,
     onExitApp: () -> Unit
 ) {
-    val motionPolicy = LocalNavigationMotion.current
+    val motionPolicy = LocalUiMotion.current
     val motionTokens = NuvioMotion.tokensFor(motionPolicy)
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val drawerItemFocusRequesters = rememberDrawerItemFocusRequesters(drawerItems)
@@ -1683,7 +1689,7 @@ private fun LegacySidebarButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val motionPolicy = LocalNavigationMotion.current
+    val motionPolicy = LocalUiMotion.current
     val motionTokens = NuvioMotion.tokensFor(motionPolicy)
     var isFocused by remember { mutableStateOf(false) }
     val itemShape = NuvioTheme.shapes.navItem
@@ -1722,7 +1728,7 @@ private fun LegacySidebarButton(
         null
     }
     val itemScale by animateFloatAsState(
-        targetValue = if (isFocused && expanded && motionPolicy.allowsSpatialEffects) 1.04f else 1f,
+        targetValue = if (isFocused && expanded) motionPolicy.scale(1.04f) else 1f,
         animationSpec = tween(durationMillis = motionTokens.durations.fast, easing = motionTokens.easings.standard),
         label = "legacySidebarItemScale"
     )
@@ -1798,7 +1804,7 @@ private fun ModernSidebarScaffold(
     onNavigate: (String) -> Unit,
     onExitApp: () -> Unit
 ) {
-    val motionPolicy = LocalNavigationMotion.current
+    val motionPolicy = LocalUiMotion.current
     val motionTokens = NuvioMotion.tokensFor(motionPolicy)
     val showSidebar = currentRoute in rootRoutes
     val sidebarTokens = NuvioComponents.tokens.sidebar
@@ -2226,7 +2232,7 @@ private fun CollapsedSidebarPill(
     modifier: Modifier = Modifier,
     onExpand: () -> Unit
 ) {
-    val motionPolicy = LocalNavigationMotion.current
+    val motionPolicy = LocalUiMotion.current
     val motionTokens = NuvioMotion.tokensFor(motionPolicy)
     val pillShape = RoundedCornerShape(NuvioRadii.tokens.full)
     val colors = NuvioTheme.colors

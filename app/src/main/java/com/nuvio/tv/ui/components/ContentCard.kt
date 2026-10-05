@@ -112,7 +112,7 @@ fun ContentCard(
     onLongPress: (() -> Unit)? = null,
     onClick: () -> Unit = {}
 ) {
-    val motionPolicy = com.nuvio.tv.ui.theme.LocalNavigationMotion.current
+    val motionPolicy = com.nuvio.tv.ui.theme.LocalUiMotion.current
     val cardShape = remember(posterCardStyle.cornerRadius) { RoundedCornerShape(posterCardStyle.cornerRadius) }
     val cardDepthStyle = LocalCardDepthStyle.current
     val globalLandscape = LocalLandscapePosterMode.current
@@ -190,7 +190,7 @@ fun ContentCard(
             val targetCardWidth = if (isBackdropExpanded) expandedCardWidth else baseCardWidth
             val width by animateDpAsState(
                 targetValue = targetCardWidth,
-                animationSpec = tween(if (motionPolicy.allowsSpatialEffects) 240 else 0),
+                animationSpec = tween(if (motionPolicy.allowsSpatialEffects) motionPolicy.durationMillis(240) else 0),
                 label = "contentCardWidth"
             )
             width
@@ -392,8 +392,8 @@ fun ContentCard(
                 )
             ),
             scale = CardDefaults.scale(
-                focusedScale = if (motionPolicy.allowsSpatialEffects) posterCardStyle.focusedScale else 1f,
-                pressedScale = if (motionPolicy.allowsSpatialEffects) 0.98f else 1f,
+                focusedScale = motionPolicy.scale(posterCardStyle.focusedScale),
+                pressedScale = motionPolicy.scale(0.98f),
             )
         ) {
             Box(

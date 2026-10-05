@@ -6,6 +6,7 @@ import com.nuvio.tv.data.repository.MemberAccessRepository
 import com.nuvio.tv.domain.model.AppFont
 import com.nuvio.tv.domain.model.AppTheme
 import com.nuvio.tv.domain.model.NavigationMotion
+import com.nuvio.tv.domain.model.AnimationIntensity
 import com.nuvio.tv.domain.model.CustomThemeColors
 import com.nuvio.tv.domain.model.MemberAccess
 import com.nuvio.tv.domain.model.MemberTier
@@ -37,6 +38,7 @@ class ThemeSettingsViewModelTest {
     private val selection = MutableStateFlow(ThemeSelection(AppTheme.CUSTOM, gradient))
     private val access = MutableStateFlow(MemberAccess.None)
     private val motion = MutableStateFlow(NavigationMotion.FULL)
+    private val intensity = MutableStateFlow(AnimationIntensity.STANDARD)
     private val store = mockk<ThemeDataStore> {
         every { themeSelection } returns selection
         every { selectedFont } returns flowOf(AppFont.INTER)
@@ -44,10 +46,26 @@ class ThemeSettingsViewModelTest {
         every { amoledSurfacesMode } returns flowOf(false)
         every { settingsUiStyle } returns flowOf(SettingsUiStyle.CLASSIC)
         every { navigationMotion } returns motion
+        every { animationIntensity } returns intensity
+        coEvery { setAnimationIntensity(any()) } coAnswers { intensity.value = firstArg() }
         coEvery { setNavigationMotion(any()) } coAnswers { motion.value = firstArg() }
         coEvery { setCustomTheme(any()) } coAnswers {
             selection.value = ThemeSelection(AppTheme.CUSTOM, firstArg())
         }
+    }
+
+    @Test
+    fun intensityChoiceUpdatesTheActiveProfileFlowWithoutChangingMotionMode() = runTest {
+        val viewModel = createViewModel()
+        runCurrent()
+        viewModel.onEvent(ThemeSettingsEvent.SelectAnimationIntensity(AnimationIntensity.CINEMATIC))
+        runCurrent()
+        coVerify(exactly = 1) { store.setAnimationIntensity(AnimationIntensity.CINEMATIC) }
+        assertEquals(AnimationIntensity.CINEMATIC, viewModel.uiState.value.animationIntensity)
+        assertEquals(NavigationMotion.FULL, viewModel.uiState.value.navigationMotion)
+        intensity.value = AnimationIntensity.SUBTLE
+        runCurrent()
+        assertEquals(AnimationIntensity.SUBTLE, viewModel.uiState.value.animationIntensity)
     }
 
     @Test

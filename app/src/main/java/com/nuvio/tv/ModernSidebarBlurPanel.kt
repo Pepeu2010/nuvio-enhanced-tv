@@ -239,7 +239,7 @@ private fun SidebarNavigationItem(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val motionPolicy = com.nuvio.tv.ui.theme.LocalNavigationMotion.current
+    val motionPolicy = com.nuvio.tv.ui.theme.LocalUiMotion.current
     val motionTokens = NuvioMotion.tokensFor(motionPolicy)
     var isFocused by remember { mutableStateOf(false) }
     val colors = NuvioTheme.colors
@@ -284,7 +284,7 @@ private fun SidebarNavigationItem(
     )
     val iconTint = if (selected && !isFocused) iconTintTarget else animatedIconTint
     val itemScale by animateFloatAsState(
-        targetValue = if (isFocused && motionPolicy.allowsSpatialEffects) 1.04f else 1f,
+        targetValue = if (isFocused) motionPolicy.scale(1.04f) else 1f,
         animationSpec = tween(durationMillis = motionTokens.durations.fast, easing = motionTokens.easings.standard),
         label = "sidebarItemScale"
     )

@@ -452,7 +452,7 @@ fun rememberShimmerBrush(backdropAware: Boolean = false): Brush {
             NuvioTheme.colors.SurfaceVariant.copy(alpha = 0.30f)
         )
     }
-    if (!com.nuvio.tv.ui.theme.LocalNavigationMotion.current.allowsSpatialEffects) {
+    if (!com.nuvio.tv.ui.theme.LocalUiMotion.current.allowsSpatialEffects) {
         return Brush.linearGradient(listOf(shimmerColors[0], shimmerColors[0]))
     }
     val transition = rememberInfiniteTransition(label = "shimmer")

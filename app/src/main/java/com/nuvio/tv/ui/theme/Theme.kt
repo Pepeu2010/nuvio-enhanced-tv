@@ -48,6 +48,7 @@ val LocalThemePalette = staticCompositionLocalOf { ThemeColors.White }
 
 val LocalSettingsUiStyle = staticCompositionLocalOf { SettingsUiStyle.CLASSIC }
 val LocalNavigationMotion = androidx.compose.runtime.compositionLocalOf { NavigationMotion.FULL }
+val LocalUiMotion = androidx.compose.runtime.compositionLocalOf { com.nuvio.tv.domain.model.UiMotionPolicy() }
 
 val LocalNuvioFocusRingStyle = staticCompositionLocalOf {
     createFocusRingStyle(ThemeColors.Ocean)
@@ -62,6 +63,7 @@ fun NuvioTheme(
     amoledSurfacesMode: Boolean = false,
     settingsUiStyle: SettingsUiStyle = SettingsUiStyle.CLASSIC,
     navigationMotion: NavigationMotion = NavigationMotion.FULL,
+    animationIntensity: com.nuvio.tv.domain.model.AnimationIntensity = com.nuvio.tv.domain.model.AnimationIntensity.STANDARD,
     customThemeColors: CustomThemeColors = CustomThemeColors.Default,
     content: @Composable () -> Unit
 ) {
@@ -109,6 +111,7 @@ fun NuvioTheme(
         LocalThemePalette provides palette,
         LocalSettingsUiStyle provides settingsUiStyle,
         LocalNavigationMotion provides navigationMotion,
+        LocalUiMotion provides com.nuvio.tv.domain.model.UiMotionPolicy(navigationMotion, animationIntensity),
         LocalNuvioFocusRingStyle provides focusRingStyle
     ) {
         MaterialTheme(
@@ -164,7 +167,7 @@ object NuvioTheme {
     val motion: NuvioMotionTokens
         @Composable
         @ReadOnlyComposable
-        get() = NuvioMotion.tokensFor(LocalNavigationMotion.current)
+        get() = NuvioMotion.tokensFor(LocalUiMotion.current)
 
     val focus: NuvioFocusTokens
         get() = NuvioFocus.tokens

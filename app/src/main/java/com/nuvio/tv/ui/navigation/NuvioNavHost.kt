@@ -1,7 +1,7 @@
 package com.nuvio.tv.ui.navigation
 
 import com.nuvio.tv.ui.theme.NuvioMotion
-import com.nuvio.tv.ui.theme.LocalNavigationMotion
+import com.nuvio.tv.ui.theme.LocalUiMotion
 import com.nuvio.tv.ui.components.PlaybackAvailabilityProvider
 import com.nuvio.tv.ui.components.LocalPlaybackAvailability
 import com.nuvio.tv.ui.components.canStream
@@ -76,7 +76,7 @@ private fun PlaybackNavHost(
     hideBuiltInHeaders: Boolean
 ) {
     val playbackAvailability = LocalPlaybackAvailability.current
-    val navigationDuration = LocalNavigationMotion.current.durationMillis(NuvioMotion.tokens.durations.medium)
+    val navigationDuration = LocalUiMotion.current.durationMillis(NuvioMotion.tokens.durations.medium)
     val context = LocalContext.current
     fun isStreamToPlayer(from: String, to: String): Boolean {
         return from.startsWith("stream/") && to.startsWith("player/")

@@ -7,6 +7,26 @@ import org.junit.Test
 
 class ThemeAccessTest {
     @Test
+    fun intensityChangesFullFeedbackWhileOffAndReducedKeepTheirSafetyRules() {
+        val standard = com.nuvio.tv.ui.theme.NuvioMotion.tokensFor(NavigationMotion.FULL)
+        val subtle = com.nuvio.tv.ui.theme.NuvioMotion.tokensFor(UiMotionPolicy(intensity = AnimationIntensity.SUBTLE))
+        val cinematic = com.nuvio.tv.ui.theme.NuvioMotion.tokensFor(UiMotionPolicy(intensity = AnimationIntensity.CINEMATIC))
+        assertTrue(subtle.durations.fast < standard.durations.fast)
+        assertTrue(cinematic.durations.fast > standard.durations.fast)
+        assertTrue(subtle.focusScale < standard.focusScale)
+        for (intensity in AnimationIntensity.entries) {
+            val off = com.nuvio.tv.ui.theme.NuvioMotion.tokensFor(UiMotionPolicy(NavigationMotion.OFF, intensity))
+            val reduced = com.nuvio.tv.ui.theme.NuvioMotion.tokensFor(UiMotionPolicy(NavigationMotion.REDUCED, intensity))
+            assertEquals(0, off.durations.medium)
+            assertEquals(0, off.durations.shimmer)
+            assertEquals(1f, off.focusScale)
+            assertEquals(1f, reduced.focusScale)
+            assertTrue(reduced.durations.sidebarPanelIn <= 120)
+        }
+        assertEquals(AnimationIntensity.STANDARD, AnimationIntensity.fromName("unknown"))
+    }
+
+    @Test
     fun shellPolicyDisablesSpatialFocusWithoutRemovingFeedbackOrChangingFullDefaults() {
         val full = com.nuvio.tv.ui.theme.NuvioMotion.tokensFor(NavigationMotion.FULL)
         val off = com.nuvio.tv.ui.theme.NuvioMotion.tokensFor(NavigationMotion.OFF)

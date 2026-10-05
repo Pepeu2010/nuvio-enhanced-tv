@@ -66,6 +66,7 @@ import com.nuvio.tv.R
 import com.nuvio.tv.domain.model.AppIconOption
 import com.nuvio.tv.domain.model.AppTheme
 import com.nuvio.tv.domain.model.NavigationMotion
+import com.nuvio.tv.domain.model.AnimationIntensity
 import com.nuvio.tv.domain.model.CustomThemeColors
 import com.nuvio.tv.domain.model.SettingsUiStyle
 import com.nuvio.tv.ui.components.NuvioDialog
@@ -100,6 +101,7 @@ fun ThemeSettingsContent(
     val appIconState by viewModel.appIconState.collectAsStateWithLifecycle()
     var showFontDialog by remember { mutableStateOf(false) }
     var showMotionDialog by remember { mutableStateOf(false) }
+    var showIntensityDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showAppIconDialog by remember { mutableStateOf(false) }
     var showCustomThemeDialog by remember(uiState.customThemeGradientEnabled) { mutableStateOf(false) }
@@ -316,6 +318,12 @@ fun ThemeSettingsContent(
                     onClick = { showMotionDialog = true }
                 )
                 SettingsActionRow(
+                    title = stringResource(R.string.enhanced_animation_intensity),
+                    subtitle = stringResource(R.string.enhanced_animation_intensity_description),
+                    value = stringResource(uiState.animationIntensity.labelRes),
+                    onClick = { showIntensityDialog = true }
+                )
+                SettingsActionRow(
                     title = stringResource(R.string.appearance_font),
                     subtitle = stringResource(R.string.appearance_font_subtitle),
                     value = uiState.selectedFont.displayName,
@@ -371,6 +379,21 @@ fun ThemeSettingsContent(
                 showMotionDialog = false
             },
             onDismiss = { showMotionDialog = false },
+            width = 400.dp,
+            maxHeight = 280.dp
+        )
+    }
+
+    if (showIntensityDialog) {
+        SettingsSingleChoiceDialog(
+            title = stringResource(R.string.enhanced_animation_intensity),
+            options = AnimationIntensity.entries.map { SettingsPickerOption(it, stringResource(it.labelRes)) },
+            selectedValue = uiState.animationIntensity,
+            onOptionSelected = {
+                viewModel.onEvent(ThemeSettingsEvent.SelectAnimationIntensity(it))
+                showIntensityDialog = false
+            },
+            onDismiss = { showIntensityDialog = false },
             width = 400.dp,
             maxHeight = 280.dp
         )
@@ -618,4 +641,11 @@ private val NavigationMotion.labelRes: Int
         NavigationMotion.FULL -> R.string.enhanced_motion_full
         NavigationMotion.REDUCED -> R.string.enhanced_motion_reduced
         NavigationMotion.OFF -> R.string.enhanced_motion_off
+    }
+
+private val AnimationIntensity.labelRes: Int
+    get() = when (this) {
+        AnimationIntensity.SUBTLE -> R.string.enhanced_intensity_subtle
+        AnimationIntensity.STANDARD -> R.string.enhanced_intensity_standard
+        AnimationIntensity.CINEMATIC -> R.string.enhanced_intensity_cinematic
     }

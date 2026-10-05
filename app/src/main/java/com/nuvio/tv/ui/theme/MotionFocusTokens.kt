@@ -92,7 +92,11 @@ object NuvioMotion {
     )
 
     fun tokensFor(policy: NavigationMotion): NuvioMotionTokens {
-        if (policy == NavigationMotion.FULL) return tokens
+        return tokensFor(com.nuvio.tv.domain.model.UiMotionPolicy(policy))
+    }
+
+    fun tokensFor(policy: com.nuvio.tv.domain.model.UiMotionPolicy): NuvioMotionTokens {
+        if (policy.mode == NavigationMotion.FULL && policy.intensity == com.nuvio.tv.domain.model.AnimationIntensity.STANDARD) return tokens
         val d = tokens.durations
         return tokens.copy(
             durations = d.copy(
@@ -106,9 +110,9 @@ object NuvioMotion {
                 sidebarBloomOut = policy.durationMillis(d.sidebarBloomOut),
                 sidebarEnter = policy.durationMillis(d.sidebarEnter),
                 sidebarExit = policy.durationMillis(d.sidebarExit),
-                hero = policy.durationMillis(d.hero), shimmer = 0,
+                hero = policy.durationMillis(d.hero), shimmer = if (policy.allowsSpatialEffects) policy.durationMillis(d.shimmer) else 0,
             ),
-            focusScale = 1f, selectedScale = 1f, pressedScale = 1f,
+            focusScale = policy.scale(tokens.focusScale), selectedScale = policy.scale(tokens.selectedScale), pressedScale = policy.scale(tokens.pressedScale),
         )
     }
 

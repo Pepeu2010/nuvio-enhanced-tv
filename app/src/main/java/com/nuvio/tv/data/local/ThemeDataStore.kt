@@ -10,6 +10,7 @@ import com.nuvio.tv.domain.model.CustomThemeColors
 import com.nuvio.tv.domain.model.SettingsUiStyle
 import com.nuvio.tv.domain.model.ThemeSelection
 import com.nuvio.tv.domain.model.NavigationMotion
+import com.nuvio.tv.domain.model.AnimationIntensity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -38,6 +39,17 @@ class ThemeDataStore @Inject constructor(
     private val amoledSurfacesModeKey = booleanPreferencesKey("amoled_surfaces_mode")
     private val settingsUiStyleKey = stringPreferencesKey("settings_ui_style")
     private val navigationMotionKey = stringPreferencesKey("enhanced_navigation_motion")
+    private val animationIntensityKey = stringPreferencesKey("enhanced_animation_intensity")
+
+    val animationIntensity: Flow<AnimationIntensity> = profileManager.activeProfileId.flatMapLatest { pid ->
+        factory.get(pid, LOCAL_FEATURE).data.map { prefs -> AnimationIntensity.fromName(prefs[animationIntensityKey]) }
+    }
+
+    suspend fun setAnimationIntensity(intensity: AnimationIntensity) {
+        factory.get(profileManager.activeProfileId.value, LOCAL_FEATURE).edit { prefs ->
+            prefs[animationIntensityKey] = intensity.name
+        }
+    }
 
     val navigationMotion: Flow<NavigationMotion> = profileManager.activeProfileId.flatMapLatest { pid ->
         factory.get(pid, LOCAL_FEATURE).data.map { prefs -> NavigationMotion.fromName(prefs[navigationMotionKey]) }

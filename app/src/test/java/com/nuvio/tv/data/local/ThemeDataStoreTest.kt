@@ -3,6 +3,7 @@ package com.nuvio.tv.data.local
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.nuvio.tv.core.profile.ProfileManager
 import com.nuvio.tv.domain.model.NavigationMotion
+import com.nuvio.tv.domain.model.AnimationIntensity
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,12 +32,18 @@ class ThemeDataStoreTest {
         }
         val theme = ThemeDataStore(factory, manager)
         assertEquals(NavigationMotion.FULL, theme.navigationMotion.first())
+        assertEquals(AnimationIntensity.STANDARD, theme.animationIntensity.first())
+        theme.setAnimationIntensity(AnimationIntensity.CINEMATIC)
         theme.setNavigationMotion(NavigationMotion.OFF)
         assertEquals(NavigationMotion.OFF, theme.navigationMotion.first())
         activeProfile.value = 2
+        assertEquals(AnimationIntensity.STANDARD, theme.animationIntensity.first())
+        theme.setAnimationIntensity(AnimationIntensity.SUBTLE)
         assertEquals(NavigationMotion.FULL, theme.navigationMotion.first())
         theme.setNavigationMotion(NavigationMotion.REDUCED)
         activeProfile.value = 1
+        assertEquals(AnimationIntensity.CINEMATIC, theme.animationIntensity.first())
+        assertEquals(AnimationIntensity.CINEMATIC, ThemeDataStore(factory, manager).animationIntensity.first())
         assertEquals(NavigationMotion.OFF, theme.navigationMotion.first())
         assertEquals(NavigationMotion.OFF, ThemeDataStore(factory, manager).navigationMotion.first())
     }

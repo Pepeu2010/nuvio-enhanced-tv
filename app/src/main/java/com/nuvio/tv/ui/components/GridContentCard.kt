@@ -79,7 +79,7 @@ fun GridContentCard(
     onLongPress: (() -> Unit)? = null,
     onFocused: () -> Unit = {}
 ) {
-    val motionPolicy = com.nuvio.tv.ui.theme.LocalNavigationMotion.current
+    val motionPolicy = com.nuvio.tv.ui.theme.LocalUiMotion.current
     val cardShape = remember(posterCardStyle.cornerRadius) { RoundedCornerShape(posterCardStyle.cornerRadius) }
     val cardDepthStyle = LocalCardDepthStyle.current
     val density = LocalDensity.current
@@ -183,8 +183,8 @@ fun GridContentCard(
                 )
             ),
             scale = CardDefaults.scale(
-                focusedScale = if (motionPolicy.allowsSpatialEffects) posterCardStyle.focusedScale else 1f,
-                pressedScale = if (motionPolicy.allowsSpatialEffects) 0.98f else 1f,
+                focusedScale = motionPolicy.scale(posterCardStyle.focusedScale),
+                pressedScale = motionPolicy.scale(0.98f),
             )
         ) {
             Box(

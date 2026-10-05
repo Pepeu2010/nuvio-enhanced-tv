@@ -1,6 +1,26 @@
 package com.nuvio.tv.domain.model
 
 /** Local per-profile navigation preference; not an addition to the official sync contract. */
+enum class AnimationIntensity(val fraction: Float) {
+    SUBTLE(0.65f), STANDARD(1f), CINEMATIC(1.25f);
+
+    fun durationMillis(duration: Int): Int = (duration.coerceAtLeast(0) * fraction).toInt()
+    fun scale(value: Float): Float = 1f + (value - 1f) * fraction
+
+    companion object {
+        fun fromName(value: String?): AnimationIntensity = entries.firstOrNull { it.name == value } ?: STANDARD
+    }
+}
+
+data class UiMotionPolicy(
+    val mode: NavigationMotion = NavigationMotion.FULL,
+    val intensity: AnimationIntensity = AnimationIntensity.STANDARD,
+) {
+    val allowsSpatialEffects: Boolean get() = mode.allowsSpatialEffects
+    fun durationMillis(duration: Int): Int = mode.durationMillis(intensity.durationMillis(duration))
+    fun scale(value: Float): Float = if (allowsSpatialEffects) intensity.scale(value) else 1f
+}
+
 enum class NavigationMotion {
     FULL, REDUCED, OFF;
 
