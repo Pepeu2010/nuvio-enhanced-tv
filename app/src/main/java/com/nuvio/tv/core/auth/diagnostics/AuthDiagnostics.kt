@@ -5,6 +5,9 @@ import android.os.Build
 import android.os.SystemClock
 import android.util.Log
 import com.nuvio.tv.BuildConfig
+import com.nuvio.tv.core.diagnostics.redactDiagnosticText
+import com.nuvio.tv.core.logging.diagnosticSummary
+import com.nuvio.tv.core.logging.urlForLog
 import com.nuvio.tv.data.remote.dto.AuthDiagnosticAppDto
 import com.nuvio.tv.data.remote.dto.AuthDiagnosticDeviceDto
 import com.nuvio.tv.data.remote.dto.AuthDiagnosticEnvironmentDto
@@ -23,6 +26,9 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.doubleOrNull
 import okhttp3.Call
 import okhttp3.EventListener
 import okhttp3.Handshake
@@ -30,8 +36,6 @@ import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
 import java.io.IOException
-import java.io.PrintWriter
-import java.io.StringWriter
 import java.net.ConnectException
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -44,8 +48,7 @@ import javax.net.ssl.SSLException
 
 private const val TAG = "AuthDiagnostics"
 private const val EXCLUDED_CREDENTIAL = "[excluded-credential]"
-private val credentialKeyRegex = Regex("(authorization|cookie|token|secret|password|apikey|api_key|accesskey|session|refresh|bearer)", RegexOption.IGNORE_CASE)
-private val credentialJsonValueRegex = Regex("(\"[^\"]*(?:authorization|cookie|token|secret|password|apikey|api_key|accesskey|session|refresh|bearer)[^\"]*\"\\s*:\\s*)(\"(?:\\\\.|[^\"])*\"|[^,}\\]]+)", setOf(RegexOption.IGNORE_CASE))
+private val credentialKeyRegex = Regex("(authorization|cookie|token|secret|password|apikey|api_key|accesskey|session|refresh|bearer|nonce|code|verification|redirect|location|email|user.?id)", RegexOption.IGNORE_CASE)
 private val authDiagnosticsJson = Json { ignoreUnknownKeys = true }
 
 class AuthDiagnosticsSession(
@@ -70,7 +73,7 @@ class AuthDiagnosticsSession(
                 elapsedMs = elapsedMs(),
                 endpoint = endpoint,
                 method = method,
-                url = url,
+                url = url.urlForLog(),
                 request = AuthDiagnosticRequestDto(
                     headers = authDiagnosticFilteredHeaders(headers),
                     body = authDiagnosticFilteredBody(body)
@@ -87,7 +90,7 @@ class AuthDiagnosticsSession(
                 elapsedMs = elapsedMs(),
                 endpoint = endpoint,
                 method = method,
-                url = url,
+                url = url.urlForLog(),
                 response = AuthDiagnosticResponseDto(
                     statusCode = statusCode,
                     isSuccessful = isSuccessful,
@@ -114,7 +117,7 @@ class AuthDiagnosticsSession(
                     proxy = proxy,
                     protocol = protocol,
                     durationMs = durationMs,
-                    message = message
+                    message = message?.let { EXCLUDED_CREDENTIAL }
                 )
             )
         )
@@ -207,9 +210,9 @@ class AuthDiagnosticsSession(
                     supportedAbis = Build.SUPPORTED_ABIS.orEmpty().toList()
                 ),
                 environment = AuthDiagnosticEnvironmentDto(
-                    supabaseUrl = serverConfiguration.backendUrl,
+                    supabaseUrl = serverConfiguration.backendUrl.urlForLog(),
                     supabaseHost = serverConfiguration.backendUrl.hostOrNull(),
-                    tvLoginWebBaseUrl = serverConfiguration.tvLoginWebBaseUrl.orEmpty(),
+                    tvLoginWebBaseUrl = serverConfiguration.tvLoginWebBaseUrl.urlForLog(),
                     tvLoginHost = serverConfiguration.tvLoginWebBaseUrl.orEmpty().hostOrNull(),
                     tvLoginWebHost = serverConfiguration.tvLoginWebBaseUrl.orEmpty().hostOrNull(),
                     reportsBaseUrlConfigured = BuildConfig.PLAYBACK_REPORTS_BASE_URL.isNotBlank()
@@ -233,7 +236,7 @@ class AuthDiagnosticsSession(
         val result = repository.submit(payload)
         result.fold(
             onSuccess = { reportId -> Log.d(TAG, "attempt=$attemptId flow=$flowType upload=success reportId=$reportId") },
-            onFailure = { uploadError -> Log.w(TAG, "attempt=$attemptId flow=$flowType upload=queued error=${uploadError.javaClass.simpleName}: ${uploadError.message}") }
+            onFailure = { uploadError -> Log.w(TAG, "attempt=$attemptId flow=$flowType upload=queued error=${uploadError.diagnosticSummary()}") }
         )
         return result
     }
@@ -351,7 +354,7 @@ private class AuthDiagnosticEventListener(
             proxy = proxy.toString(),
             protocol = protocol?.toString(),
             durationMs = connectStartMs.durationSinceNow(),
-            message = "${ioe.javaClass.name}: ${ioe.message.orEmpty()}"
+            message = ioe.diagnosticSummary()
         )
     }
 
@@ -394,20 +397,23 @@ private class AuthDiagnosticEventListener(
             endpoint = endpoint,
             phase = "callFailed",
             durationMs = callStartMs.durationSinceNow(),
-            message = "${ioe.javaClass.name}: ${ioe.message.orEmpty()}"
+            message = ioe.diagnosticSummary()
         )
     }
 }
 
 fun authDiagnosticFilteredHeaders(headers: Map<String, String>): Map<String, String> =
-    headers.mapValues { (key, value) -> if (key.isCredentialKey()) EXCLUDED_CREDENTIAL else value }
+    headers.mapValues { (key, value) ->
+        if (key.lowercase() in setOf("content-type", "content-length", "accept")) redactDiagnosticText(value)
+        else EXCLUDED_CREDENTIAL
+    }
 
 fun authDiagnosticFilteredBody(body: String?): String? {
     if (body == null) return null
     if (body.isBlank()) return body
     val parsed = runCatching { authDiagnosticsJson.parseToJsonElement(body) }.getOrNull()
-    if (parsed != null) return filterJsonElement(parsed).toString()
-    return credentialJsonValueRegex.replace(body) { match -> "${match.groupValues[1]}\"$EXCLUDED_CREDENTIAL\"" }
+    if (parsed is JsonObject || parsed is JsonArray) return filterJsonElement(parsed).toString()
+    return EXCLUDED_CREDENTIAL
 }
 
 fun authNetworkErrorFamily(error: Throwable?): String? {
@@ -426,7 +432,7 @@ fun authNetworkErrorFamily(error: Throwable?): String? {
 
 private fun authDiagnosticFilteredDetail(detail: Map<String, String?>): Map<String, String> =
     detail.mapNotNull { (key, value) ->
-        if (value == null) null else key to if (key.isCredentialKey()) EXCLUDED_CREDENTIAL else value
+        if (value == null) null else key to EXCLUDED_CREDENTIAL
     }.toMap()
 
 private fun filterJsonElement(element: JsonElement, key: String? = null): JsonElement {
@@ -434,6 +440,9 @@ private fun filterJsonElement(element: JsonElement, key: String? = null): JsonEl
     return when (element) {
         is JsonObject -> JsonObject(element.mapValues { (childKey, childValue) -> filterJsonElement(childValue, childKey) })
         is JsonArray -> JsonArray(element.map { child -> filterJsonElement(child) })
+        is JsonPrimitive -> if (!element.isString && (
+            element == JsonNull || element.booleanOrNull != null || element.doubleOrNull?.isFinite() == true
+        )) element else JsonPrimitive(EXCLUDED_CREDENTIAL)
         else -> element
     }
 }
@@ -448,7 +457,7 @@ private fun String.hostOrNull(): String? =
 private fun Throwable.toAuthDiagnosticExceptionDto(): AuthDiagnosticExceptionDto =
     AuthDiagnosticExceptionDto(
         className = javaClass.name,
-        message = message,
+        message = EXCLUDED_CREDENTIAL,
         causeChain = causeChain(),
         stackTrace = stackTraceString()
     )
@@ -456,17 +465,15 @@ private fun Throwable.toAuthDiagnosticExceptionDto(): AuthDiagnosticExceptionDto
 private fun Throwable.causeChain(): List<String> {
     val chain = mutableListOf<String>()
     var current: Throwable? = this
-    while (current != null) {
-        chain += "${current.javaClass.name}: ${current.message.orEmpty()}"
+    while (current != null && chain.size < 6) {
+        chain += "${current.javaClass.name}:"
         current = current.cause
     }
     return chain
 }
 
 private fun Throwable.stackTraceString(): String {
-    val writer = StringWriter()
-    printStackTrace(PrintWriter(writer))
-    return writer.toString()
+    return stackTrace.joinToString("\n") { "\tat $it" }
 }
 
 private inline fun <reified T : Throwable> Throwable.hasCause(): Boolean {
