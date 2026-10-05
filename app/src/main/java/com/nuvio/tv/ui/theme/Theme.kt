@@ -162,7 +162,9 @@ object NuvioTheme {
         get() = NuvioEffects.tokens
 
     val motion: NuvioMotionTokens
-        get() = NuvioMotion.tokens
+        @Composable
+        @ReadOnlyComposable
+        get() = NuvioMotion.tokensFor(LocalNavigationMotion.current)
 
     val focus: NuvioFocusTokens
         get() = NuvioFocus.tokens

@@ -14,10 +14,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import com.nuvio.tv.ui.theme.LocalNavigationMotion
 
 @Composable
 fun Modifier.shimmer(active: Boolean = true): Modifier {
-    if (!active) return this
+    if (!active || !LocalNavigationMotion.current.allowsSpatialEffects) return this
     val progress = rememberInfiniteTransition(label = "shimmer").animateFloat(
         initialValue = 0f,
         targetValue = 1f,

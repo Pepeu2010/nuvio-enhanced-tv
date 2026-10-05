@@ -2,6 +2,7 @@ package com.nuvio.tv.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -67,8 +68,10 @@ fun SidebarNavigation(
     onNavigate: (String) -> Unit
 ) {
     val sidebarWidth = NuvioTheme.sizes.sidebar.expandedWidth
+    val motion = NuvioTheme.motion
     val sidebarAlpha by animateFloatAsState(
         targetValue = if (isExpanded) 1f else 0f,
+        animationSpec = tween(motion.durations.medium),
         label = "sidebarAlpha"
     )
 
@@ -113,12 +116,15 @@ private fun SidebarNavItem(
     onNavigate: (String) -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
+    val motion = NuvioTheme.motion
     val backgroundColor by animateColorAsState(
         targetValue = if (isFocused || isSelected) NuvioTheme.colors.FocusBackground else Color.Transparent,
+        animationSpec = tween(motion.durations.fast),
         label = "navItemBackground"
     )
     val borderColor by animateColorAsState(
         targetValue = if (isFocused) NuvioTheme.colors.FocusRing else Color.Transparent,
+        animationSpec = tween(motion.durations.fast),
         label = "navItemBorder"
     )
 
@@ -142,7 +148,8 @@ private fun SidebarNavItem(
                 shape = NavItemShape
             )
         ),
-        shape = CardDefaults.shape(shape = NavItemShape)
+        shape = CardDefaults.shape(shape = NavItemShape),
+        scale = CardDefaults.scale(focusedScale = motion.focusScale, pressedScale = motion.pressedScale)
     ) {
         Row(
             modifier = Modifier

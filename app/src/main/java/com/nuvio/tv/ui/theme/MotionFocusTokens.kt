@@ -10,6 +10,7 @@ import androidx.compose.animation.core.TweenSpec
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Immutable
+import com.nuvio.tv.domain.model.NavigationMotion
 
 @Immutable
 data class NuvioMotionDurations(
@@ -89,6 +90,27 @@ object NuvioMotion {
         pressedScale = 0.98f,
         reducedMotionScale = 1f
     )
+
+    fun tokensFor(policy: NavigationMotion): NuvioMotionTokens {
+        if (policy == NavigationMotion.FULL) return tokens
+        val d = tokens.durations
+        return tokens.copy(
+            durations = d.copy(
+                quick = policy.durationMillis(d.quick), fast = policy.durationMillis(d.fast),
+                medium = policy.durationMillis(d.medium), slow = policy.durationMillis(d.slow),
+                overlay = policy.durationMillis(d.overlay),
+                sidebarLabelIn = policy.durationMillis(d.sidebarLabelIn),
+                sidebarLabelOut = policy.durationMillis(d.sidebarLabelOut),
+                sidebarPanelIn = policy.durationMillis(d.sidebarPanelIn),
+                sidebarPanelOut = policy.durationMillis(d.sidebarPanelOut),
+                sidebarBloomOut = policy.durationMillis(d.sidebarBloomOut),
+                sidebarEnter = policy.durationMillis(d.sidebarEnter),
+                sidebarExit = policy.durationMillis(d.sidebarExit),
+                hero = policy.durationMillis(d.hero), shimmer = 0,
+            ),
+            focusScale = 1f, selectedScale = 1f, pressedScale = 1f,
+        )
+    }
 
     fun <T> quickTween(): TweenSpec<T> = tween(tokens.durations.quick, easing = tokens.easings.standard)
 

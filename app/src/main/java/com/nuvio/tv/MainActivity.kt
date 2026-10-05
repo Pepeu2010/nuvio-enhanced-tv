@@ -184,6 +184,7 @@ import com.nuvio.tv.ui.screens.profile.ProfileSelectionScreen
 import com.nuvio.tv.ui.theme.NuvioComponents
 import com.nuvio.tv.ui.theme.NuvioLayout
 import com.nuvio.tv.ui.theme.NuvioMotion
+import com.nuvio.tv.ui.theme.LocalNavigationMotion
 import com.nuvio.tv.ui.theme.NuvioPrimitives
 import com.nuvio.tv.ui.theme.NuvioRadii
 import com.nuvio.tv.ui.theme.NuvioStrokes
@@ -1395,6 +1396,8 @@ private fun LegacySidebarScaffold(
     onNavigate: (String) -> Unit,
     onExitApp: () -> Unit
 ) {
+    val motionPolicy = LocalNavigationMotion.current
+    val motionTokens = NuvioMotion.tokensFor(motionPolicy)
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val drawerItemFocusRequesters = rememberDrawerItemFocusRequesters(drawerItems)
     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
@@ -1492,7 +1495,7 @@ private fun LegacySidebarScaffold(
                     val isExpanded = drawerValue == DrawerValue.Open
                     val itemWidth by animateDpAsState(
                         targetValue = if (isExpanded) openDrawerItemWidth else NuvioTheme.sizes.avatars.md,
-                        animationSpec = tween(durationMillis = NuvioMotion.tokens.durations.fast, easing = NuvioMotion.tokens.easings.standard),
+                        animationSpec = tween(durationMillis = motionTokens.durations.fast, easing = motionTokens.easings.standard),
                         label = "legacySidebarItemWidth"
                     )
 
@@ -1604,7 +1607,7 @@ private fun LegacySidebarScaffold(
             } else {
                 NuvioTheme.spacing.none
             },
-            animationSpec = tween(NuvioMotion.tokens.durations.medium),
+            animationSpec = tween(motionTokens.durations.medium),
             label = "contentStartPadding"
         )
         Box(
@@ -1680,6 +1683,8 @@ private fun LegacySidebarButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val motionPolicy = LocalNavigationMotion.current
+    val motionTokens = NuvioMotion.tokensFor(motionPolicy)
     var isFocused by remember { mutableStateOf(false) }
     val itemShape = NuvioTheme.shapes.navItem
     val backgroundColor by animateColorAsState(
@@ -1688,6 +1693,7 @@ private fun LegacySidebarButton(
             expanded && selected -> NuvioTheme.colors.Secondary
             else -> Color.Transparent
         },
+        animationSpec = tween(motionTokens.durations.fast),
         label = "legacySidebarItemBackground"
     )
     val contentColor by animateColorAsState(
@@ -1696,6 +1702,7 @@ private fun LegacySidebarButton(
             expanded && selected -> NuvioTheme.colors.OnSecondary
             else -> NuvioTheme.colors.TextSecondary
         },
+        animationSpec = tween(motionTokens.durations.fast),
         label = "legacySidebarItemContent"
     )
     val iconTint by animateColorAsState(
@@ -1706,6 +1713,7 @@ private fun LegacySidebarButton(
             !expanded -> NuvioTheme.colors.TextTertiary
             else -> NuvioTheme.colors.TextSecondary
         },
+        animationSpec = tween(motionTokens.durations.fast),
         label = "legacySidebarItemIconTint"
     )
     val selectedCollapsedIconBrush = if (selected && !expanded) {
@@ -1714,8 +1722,8 @@ private fun LegacySidebarButton(
         null
     }
     val itemScale by animateFloatAsState(
-        targetValue = if (isFocused && expanded) 1.1f else 1f,
-        animationSpec = tween(durationMillis = NuvioMotion.tokens.durations.fast, easing = NuvioMotion.tokens.easings.standard),
+        targetValue = if (isFocused && expanded && motionPolicy.allowsSpatialEffects) 1.04f else 1f,
+        animationSpec = tween(durationMillis = motionTokens.durations.fast, easing = motionTokens.easings.standard),
         label = "legacySidebarItemScale"
     )
 
@@ -1790,6 +1798,8 @@ private fun ModernSidebarScaffold(
     onNavigate: (String) -> Unit,
     onExitApp: () -> Unit
 ) {
+    val motionPolicy = LocalNavigationMotion.current
+    val motionTokens = NuvioMotion.tokensFor(motionPolicy)
     val showSidebar = currentRoute in rootRoutes
     val sidebarTokens = NuvioComponents.tokens.sidebar
     val collapsedSidebarWidth = if (sidebarCollapsed) NuvioTheme.spacing.none else sidebarTokens.collapsedWidth
@@ -1896,7 +1906,7 @@ private fun ModernSidebarScaffold(
     val sidebarSlideX = NuvioTheme.spacing.none
     val sidebarSurfaceAlpha by animateFloatAsState(
         targetValue = if (isSidebarExpanded) 1f else 0f,
-        animationSpec = tween(durationMillis = if (isSidebarExpanded) 280 else 200, easing = animationEasing),
+        animationSpec = tween(durationMillis = motionPolicy.durationMillis(if (isSidebarExpanded) 280 else 200), easing = animationEasing),
         label = "sidebarSurfaceAlpha"
     )
     val shouldApplySidebarHaze = showSidebar && modernSidebarBlurEnabled
@@ -1910,9 +1920,9 @@ private fun ModernSidebarScaffold(
     val sidebarExpandProgress by sidebarTransition.animateFloat(
         transitionSpec = {
             if (targetState) {
-                tween(durationMillis = NuvioMotion.tokens.durations.sidebarPanelIn, easing = FastOutSlowInEasing)
+                tween(durationMillis = motionTokens.durations.sidebarPanelIn, easing = FastOutSlowInEasing)
             } else {
-                tween(durationMillis = NuvioMotion.tokens.durations.sidebarPanelOut, easing = LinearOutSlowInEasing)
+                tween(durationMillis = motionTokens.durations.sidebarPanelOut, easing = LinearOutSlowInEasing)
             }
         },
         label = "sidebarExpandProgress"
@@ -2216,6 +2226,8 @@ private fun CollapsedSidebarPill(
     modifier: Modifier = Modifier,
     onExpand: () -> Unit
 ) {
+    val motionPolicy = LocalNavigationMotion.current
+    val motionTokens = NuvioMotion.tokensFor(motionPolicy)
     val pillShape = RoundedCornerShape(NuvioRadii.tokens.full)
     val colors = NuvioTheme.colors
     val bgElevated = colors.BackgroundElevated
@@ -2278,12 +2290,12 @@ private fun CollapsedSidebarPill(
                 AnimatedVisibility(
                     visible = !iconOnly,
                     enter = expandHorizontally(
-                            animationSpec = tween(NuvioMotion.tokens.durations.fast, easing = FastOutSlowInEasing),
+                            animationSpec = tween(motionTokens.durations.fast, easing = FastOutSlowInEasing),
                             expandFrom = Alignment.Start,
                             clip = true
                         ),
                     exit = shrinkHorizontally(
-                            animationSpec = tween(NuvioMotion.tokens.durations.fast, easing = FastOutSlowInEasing),
+                            animationSpec = tween(motionTokens.durations.fast, easing = FastOutSlowInEasing),
                             shrinkTowards = Alignment.Start,
                             clip = true
                         )

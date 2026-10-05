@@ -112,6 +112,7 @@ fun ContentCard(
     onLongPress: (() -> Unit)? = null,
     onClick: () -> Unit = {}
 ) {
+    val motionPolicy = com.nuvio.tv.ui.theme.LocalNavigationMotion.current
     val cardShape = remember(posterCardStyle.cornerRadius) { RoundedCornerShape(posterCardStyle.cornerRadius) }
     val cardDepthStyle = LocalCardDepthStyle.current
     val globalLandscape = LocalLandscapePosterMode.current
@@ -187,7 +188,11 @@ fun ContentCard(
         !isFocused && !isBackdropExpanded -> baseCardWidth
         else -> {
             val targetCardWidth = if (isBackdropExpanded) expandedCardWidth else baseCardWidth
-            val width by animateDpAsState(targetValue = targetCardWidth, label = "contentCardWidth")
+            val width by animateDpAsState(
+                targetValue = targetCardWidth,
+                animationSpec = tween(if (motionPolicy.allowsSpatialEffects) 240 else 0),
+                label = "contentCardWidth"
+            )
             width
         }
     }
@@ -386,7 +391,10 @@ fun ContentCard(
                     shape = cardShape
                 )
             ),
-            scale = CardDefaults.scale(focusedScale = posterCardStyle.focusedScale)
+            scale = CardDefaults.scale(
+                focusedScale = if (motionPolicy.allowsSpatialEffects) posterCardStyle.focusedScale else 1f,
+                pressedScale = if (motionPolicy.allowsSpatialEffects) 0.98f else 1f,
+            )
         ) {
             Box(
                 modifier = Modifier
@@ -448,7 +456,7 @@ fun ContentCard(
                 val trailerCoverAlpha = if (shouldPlayTrailerPreview) {
                     val alpha by animateFloatAsState(
                         targetValue = if (!trailerFirstFrameRendered) 1f else 0f,
-                        animationSpec = tween(durationMillis = 250),
+                        animationSpec = tween(durationMillis = motionPolicy.durationMillis(250)),
                         label = "trailerCoverAlpha"
                     )
                     alpha
@@ -642,7 +650,7 @@ fun ContentCard(
                 // the width animation to reveal content.
                 androidx.compose.animation.Crossfade(
                     targetState = isBackdropExpanded,
-                    animationSpec = tween(durationMillis = if (globalLandscape) 250 else 0),
+                    animationSpec = tween(durationMillis = motionPolicy.durationMillis(if (globalLandscape) 250 else 0)),
                     label = "expandedLabelCrossfade"
                 ) { expanded ->
                 if (expanded) {

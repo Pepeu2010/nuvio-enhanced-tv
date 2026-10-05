@@ -22,6 +22,8 @@ A fundação separa identidade, armazenamento e updater do fork, exige assinatur
 
 O primeiro incremento 1-A.1 amplia a área Aparência existente com **Movimento de navegação** completo, reduzido e desligado, salvo localmente por perfil. Ele controla as transições revisadas entre telas; outros efeitos mantêm suas configurações atuais.
 
+O incremento **1-A.2 em main, ainda fora da alpha.2**, estende a política ao shell, foco dos cards e skeletons. Passaram 15 testes direcionados e os cinco APKs foram compilados. No APK novo, navegação por D-pad e geração de QR foram verificadas em emulador; o erro de provisionamento público foi corrigido no script do workspace central. Login completo, sync, playback e TV Box física ainda precisam de validação. Outros efeitos e a identidade visual completa continuam pendentes.
+
 Estão previstos: experiência cinematográfica própria para TV, melhores fluxos de foco/D-pad, Home/hero/previews aprimorados, Profile Studio, thumbnails reais/filmstrip/bookmarks, Source Intelligence e cache Auto/configurável. Live TV/EPG, Scene Info e Phone Remote entram nas fases posteriores, sem botões falsos ou canais incluídos.
 
 A referência de performance é TV Box de **2 GB de RAM e 1080p**. Suporte e FPS precisam de medição no aparelho, não de inferência a partir da compilação. A fundação passou em 84 testes direcionados; o baseline completo registrou 20 falhas herdadas e 1 teste ignorado. Login/sync/playback e QA em aparelhos reais permanecem pendentes. [Roadmap e evidências](https://github.com/Pepeu2010/nuvio-enhanced).

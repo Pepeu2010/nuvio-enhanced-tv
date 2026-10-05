@@ -7,6 +7,24 @@ import org.junit.Test
 
 class ThemeAccessTest {
     @Test
+    fun shellPolicyDisablesSpatialFocusWithoutRemovingFeedbackOrChangingFullDefaults() {
+        val full = com.nuvio.tv.ui.theme.NuvioMotion.tokensFor(NavigationMotion.FULL)
+        val off = com.nuvio.tv.ui.theme.NuvioMotion.tokensFor(NavigationMotion.OFF)
+        val reduced = com.nuvio.tv.ui.theme.NuvioMotion.tokensFor(NavigationMotion.REDUCED)
+        assertEquals(240, full.durations.medium)
+        assertEquals(0, off.durations.sidebarPanelIn)
+        assertEquals(0, off.durations.sidebarPanelOut)
+        assertEquals(0, off.durations.fast)
+        assertEquals(0, off.durations.hero)
+        assertEquals(0, off.durations.shimmer)
+        assertEquals(1f, off.focusScale)
+        assertEquals(1f, reduced.focusScale)
+        assertEquals(1f, reduced.pressedScale)
+        assertEquals(120, reduced.durations.sidebarPanelIn)
+        assertEquals(full.easings, off.easings)
+    }
+
+    @Test
     fun reducedNavigationIsNonSpatialAndCorruptStoredPreferencesKeepWorking() {
         assertFalse(NavigationMotion.REDUCED.allowsSpatialEffects)
         assertEquals(120, NavigationMotion.REDUCED.durationMillis(700))

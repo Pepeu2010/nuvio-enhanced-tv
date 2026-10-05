@@ -239,6 +239,8 @@ private fun SidebarNavigationItem(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val motionPolicy = com.nuvio.tv.ui.theme.LocalNavigationMotion.current
+    val motionTokens = NuvioMotion.tokensFor(motionPolicy)
     var isFocused by remember { mutableStateOf(false) }
     val colors = NuvioTheme.colors
     val shape = RoundedCornerShape(NuvioRadii.tokens.full)
@@ -252,7 +254,7 @@ private fun SidebarNavigationItem(
     }
     val animatedBackgroundColor by animateColorAsState(
         targetValue = backgroundColorTarget,
-        animationSpec = tween(durationMillis = NuvioMotion.tokens.durations.fast),
+        animationSpec = tween(durationMillis = motionTokens.durations.fast),
         label = "sidebarItemBackground"
     )
     val backgroundColor = if (selected && !isFocused) backgroundColorTarget else animatedBackgroundColor
@@ -264,7 +266,7 @@ private fun SidebarNavigationItem(
     }
     val animatedContentColor by animateColorAsState(
         targetValue = contentColorTarget,
-        animationSpec = tween(durationMillis = NuvioMotion.tokens.durations.fast),
+        animationSpec = tween(durationMillis = motionTokens.durations.fast),
         label = "sidebarItemContent"
     )
     val contentColor = if (selected && !isFocused) contentColorTarget else animatedContentColor
@@ -277,13 +279,13 @@ private fun SidebarNavigationItem(
     }
     val animatedIconTint by animateColorAsState(
         targetValue = iconTintTarget,
-        animationSpec = tween(durationMillis = NuvioMotion.tokens.durations.fast),
+        animationSpec = tween(durationMillis = motionTokens.durations.fast),
         label = "sidebarItemIconTint"
     )
     val iconTint = if (selected && !isFocused) iconTintTarget else animatedIconTint
     val itemScale by animateFloatAsState(
-        targetValue = if (isFocused) 1.1f else 1f,
-        animationSpec = tween(durationMillis = NuvioMotion.tokens.durations.fast, easing = NuvioMotion.tokens.easings.standard),
+        targetValue = if (isFocused && motionPolicy.allowsSpatialEffects) 1.04f else 1f,
+        animationSpec = tween(durationMillis = motionTokens.durations.fast, easing = motionTokens.easings.standard),
         label = "sidebarItemScale"
     )
 
