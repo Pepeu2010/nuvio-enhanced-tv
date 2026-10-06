@@ -11,6 +11,14 @@ import androidx.tv.material3.Typography
 import com.nuvio.tv.R
 import com.nuvio.tv.domain.model.AppFont
 
+/** Brand display face; the existing per-profile body-font preference is retained. */
+val TelumiaDisplayFamily = FontFamily(
+    Font(R.font.manrope_variable, FontWeight.Normal),
+    Font(R.font.manrope_variable, FontWeight.Medium),
+    Font(R.font.manrope_variable, FontWeight.SemiBold),
+    Font(R.font.manrope_variable, FontWeight.Bold)
+)
+
 val DMSansFamily = FontFamily(
     Font(R.font.dm_sans_variable, FontWeight.Normal),
     Font(R.font.dm_sans_variable, FontWeight.Medium),
@@ -58,28 +66,28 @@ data class NuvioTextStyleTokens(
 @OptIn(ExperimentalTvMaterial3Api::class)
 fun buildNuvioTypography(fontFamily: FontFamily): Typography = Typography(
     displayLarge = TextStyle(
-        fontFamily = fontFamily,
+        fontFamily = TelumiaDisplayFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 48.sp,
         lineHeight = 56.sp,
         letterSpacing = (-0.5).sp
     ),
     displayMedium = TextStyle(
-        fontFamily = fontFamily,
+        fontFamily = TelumiaDisplayFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 36.sp,
         lineHeight = 44.sp,
         letterSpacing = 0.sp
     ),
     headlineLarge = TextStyle(
-        fontFamily = fontFamily,
+        fontFamily = TelumiaDisplayFamily,
         fontWeight = FontWeight.SemiBold,
         fontSize = 28.sp,
         lineHeight = 36.sp,
         letterSpacing = 0.sp
     ),
     headlineMedium = TextStyle(
-        fontFamily = fontFamily,
+        fontFamily = TelumiaDisplayFamily,
         fontWeight = FontWeight.SemiBold,
         fontSize = 24.sp,
         lineHeight = 32.sp,

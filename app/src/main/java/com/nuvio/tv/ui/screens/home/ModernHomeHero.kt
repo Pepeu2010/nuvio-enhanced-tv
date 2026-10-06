@@ -6,13 +6,14 @@ import com.nuvio.tv.ui.theme.NuvioTheme
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -41,6 +42,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -49,6 +51,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.nuvio.tv.ui.theme.LocalUiMotion
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
@@ -63,13 +67,6 @@ import kotlinx.coroutines.delay
 import com.nuvio.tv.ui.components.ImdbRatingSourceLabel
 import com.nuvio.tv.ui.components.TrailerPlayer
 import androidx.compose.ui.res.stringResource
-
-private data class ModernHeroSecondaryMeta(
-    val highlightText: String?,
-    val ageRating: String?,
-    val status: String?,
-    val details: List<String>
-)
 
 @Composable
 internal fun ModernHeroScene(
@@ -339,7 +336,8 @@ internal fun HeroTitleBlock(
 }
 
 @Composable
-private fun HeroTitleContent(
+@OptIn(ExperimentalLayoutApi::class)
+internal fun HeroTitleContent(
     previewProvider: () -> HeroPreview?,
     portraitMode: Boolean,
     showImdbRatings: Boolean,
@@ -348,319 +346,106 @@ private fun HeroTitleContent(
     trailerPlaying: () -> Boolean = { false }
 ) {
     val preview = previewProvider() ?: return
-    val highlighterEnabled = LocalRecompositionHighlighterEnabled.current
-    val descriptionMaxLines = 4
-    val descriptionScale = if (portraitMode) 0.90f else 1f
-    val titleScale = if (portraitMode) 0.92f else 1f
-    val metaScale = 1f
-    val titleSpacing = NuvioTheme.spacing.sm * titleScale
-    val metaSpacing = NuvioTheme.spacing.sm * metaScale
-    val imdbMetaSpacing = NuvioTheme.spacing.xs * metaScale
+    val colors = NuvioTheme.colors
     val context = LocalContext.current
-    val density = LocalDensity.current
-    val headlineLarge = MaterialTheme.typography.headlineLarge
-    val labelMedium = MaterialTheme.typography.labelMedium
-    val bodyMedium = MaterialTheme.typography.bodyMedium
-    val logoMaxWidthPx = remember(density) { with(density) { 220.dp.roundToPx() } }
-    val logoHeightPx = remember(density) { with(density) { 100.dp.roundToPx() } }
-
-    val logoModel = remember(context, preview.logo, logoMaxWidthPx, logoHeightPx) {
-        preview.logo?.let {
-            ImageRequest.Builder(context)
-                .data(it)
-                .crossfade(true)
-                .size(width = logoMaxWidthPx, height = logoHeightPx)
-                .build()
-        }
-    }
-    val trailerPlayingValue = trailerPlaying()
+    val shortViewport = LocalConfiguration.current.screenHeightDp < 480
+    val compact = LocalConfiguration.current.screenHeightDp < 600
+    val motion = LocalUiMotion.current
     val metaAlpha by animateFloatAsState(
-        targetValue = if (trailerPlayingValue) 0f else 1f,
-        animationSpec = tween(durationMillis = 480),
-        label = "heroMetaFade"
-    )
-    val scaledTitleStyle = remember(headlineLarge, titleScale) {
-        headlineLarge.copy(
-            fontSize = headlineLarge.fontSize * titleScale,
-            lineHeight = headlineLarge.lineHeight * titleScale
-        )
+        targetValue = if (trailerPlaying()) 0f else 1f,
+        animationSpec = tween(motion.durationMillis(180)), label = "telumiaHeroMetadata")
+    val headline = MaterialTheme.typography.headlineLarge.copy(
+        fontSize = if (shortViewport) 22.sp else if (compact) 28.sp else if (portraitMode) 32.sp else 36.sp,
+        lineHeight = if (shortViewport) 25.sp else if (compact) 32.sp else 39.sp,
+        fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp,
+        textDirection = preview.title.contentTextDirection())
+    val contextLine = remember(preview.contentTypeText, preview.yearText, preview.runtimeText, preview.genres, context) {
+        buildList {
+            preview.contentTypeText?.takeIf(String::isNotBlank)?.let(::add)
+            preview.yearText?.takeIf(String::isNotBlank)?.let(::add)
+            preview.runtimeText?.takeIf(String::isNotBlank)?.let(::add)
+            preview.genres.firstOrNull()?.takeIf(String::isNotBlank)?.let {
+                add(com.nuvio.tv.ui.util.localizedGenreLabel(context, it))
+            }
+        }.joinToString("  ·  ")
     }
-    val scaledDescriptionStyle = remember(bodyMedium, descriptionScale) {
-        bodyMedium.copy(
-            fontSize = bodyMedium.fontSize * descriptionScale,
-            lineHeight = bodyMedium.lineHeight * descriptionScale
-        )
+    val status = when (preview.statusText?.trim()?.lowercase()) {
+        "ended" -> stringResource(if (preview.isSeries) R.string.series_status_ended else R.string.movie_status_ended)
+        "continuing", "returning series" -> stringResource(if (preview.isSeries) R.string.series_status_continuing else R.string.movie_status_continuing)
+        "current" -> stringResource(if (preview.isSeries) R.string.series_status_current else R.string.movie_status_current)
+        "cancelled", "canceled" -> stringResource(if (preview.isSeries) R.string.series_status_cancelled else R.string.movie_status_cancelled)
+        "released" -> stringResource(if (preview.isSeries) R.string.series_status_released else R.string.movie_status_released)
+        "planned" -> stringResource(if (preview.isSeries) R.string.series_status_planned else R.string.movie_status_planned)
+        "rumored" -> stringResource(if (preview.isSeries) R.string.series_status_rumored else R.string.movie_status_rumored)
+        "in production" -> stringResource(if (preview.isSeries) R.string.series_status_in_production else R.string.movie_status_in_production)
+        "post production" -> stringResource(if (preview.isSeries) R.string.series_status_post_production else R.string.movie_status_post_production)
+        else -> preview.statusText?.trim()?.takeIf(String::isNotBlank)
     }
+    val secondary = listOfNotNull(preview.ageRatingText, status, preview.secondaryHighlightText,
+        preview.languageText, preview.countryText).filter(String::isNotBlank).distinct()
+    val imdb = preview.imdbText?.toFloatOrNull()?.takeIf { it.isFinite() && it in 0f..10f }
+    var logoError by remember(preview.title, preview.logo) { mutableStateOf(false) }
+    val shape = RoundedCornerShape(if (compact) 16.dp else 22.dp)
 
-    Column(
-        modifier = if (highlighterEnabled) Modifier.recompositionHighlighter() else Modifier,
-        verticalArrangement = Arrangement.spacedBy(titleSpacing)
-    ) {
-        var logoLoadFailed by remember(preview.logo) { mutableStateOf(false) }
-        val showLogo = !preview.logo.isNullOrBlank() && !logoLoadFailed
-        if (showLogo) {
-            AsyncImage(
-                model = logoModel,
-                contentDescription = preview.title,
-                onError = { logoLoadFailed = true },
-                modifier = Modifier
-                    .height(100.dp)
-                    .widthIn(min = 100.dp, max = 220.dp)
-                    .fillMaxWidth(),
-                contentScale = ContentScale.Fit,
-                alignment = Alignment.CenterStart
-            )
+    Column(Modifier.fillMaxWidth().clip(shape)
+        .background(colors.Panel.copy(alpha = 0.88f))
+        .border(1.dp, colors.TextPrimary.copy(alpha = 0.10f), shape)
+        .padding(if (shortViewport) 10.dp else if (compact) 14.dp else 20.dp),
+        verticalArrangement = Arrangement.spacedBy(if (shortViewport) 6.dp else if (compact) 9.dp else 14.dp)) {
+        if (!preview.logo.isNullOrBlank() && !logoError) {
+            AsyncImage(model = preview.logo, contentDescription = preview.title,
+                modifier = Modifier.height(if (shortViewport) 48.dp else if (compact) 64.dp else 96.dp).fillMaxWidth(),
+                contentScale = ContentScale.Fit, alignment = Alignment.CenterStart,
+                onError = { logoError = true })
         } else if (preview.title.isNotBlank()) {
-            Text(
-                text = preview.title,
-                style = scaledTitleStyle,
-                color = NuvioTheme.colors.TextPrimary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
+            Text(preview.title, style = headline, color = colors.TextPrimary,
+                maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
-
-        val strStatusEnded = stringResource(if (preview.isSeries) R.string.series_status_ended else R.string.movie_status_ended)
-        val strStatusContinuing = stringResource(if (preview.isSeries) R.string.series_status_continuing else R.string.movie_status_continuing)
-        val strStatusCurrent = stringResource(if (preview.isSeries) R.string.series_status_current else R.string.movie_status_current)
-        val strStatusCancelled = stringResource(if (preview.isSeries) R.string.series_status_cancelled else R.string.movie_status_cancelled)
-        val strStatusReleased = stringResource(if (preview.isSeries) R.string.series_status_released else R.string.movie_status_released)
-        val strStatusPlanned = stringResource(if (preview.isSeries) R.string.series_status_planned else R.string.movie_status_planned)
-        val strStatusRumored = stringResource(if (preview.isSeries) R.string.series_status_rumored else R.string.movie_status_rumored)
-        val strStatusInProduction = stringResource(if (preview.isSeries) R.string.series_status_in_production else R.string.movie_status_in_production)
-        val strStatusPostProduction = stringResource(if (preview.isSeries) R.string.series_status_post_production else R.string.movie_status_post_production)
-        val secondaryMeta = remember(
-            preview.secondaryHighlightText,
-            preview.ageRatingText,
-            preview.statusText,
-            preview.languageText
-        ) {
-            ModernHeroSecondaryMeta(
-                highlightText = preview.secondaryHighlightText?.trim()?.takeIf { it.isNotBlank() },
-                ageRating = preview.ageRatingText?.trim()?.takeIf { it.isNotBlank() },
-                status = when (preview.statusText?.trim()?.lowercase()) {
-                    "ended" -> strStatusEnded.uppercase()
-                    "continuing", "returning series" -> strStatusContinuing.uppercase()
-                    "current" -> strStatusCurrent.uppercase()
-                    "cancelled", "canceled" -> strStatusCancelled.uppercase()
-                    "released" -> strStatusReleased.uppercase()
-                    "planned" -> strStatusPlanned.uppercase()
-                    "rumored" -> strStatusRumored.uppercase()
-                    "in production" -> strStatusInProduction.uppercase()
-                    "post production" -> strStatusPostProduction.uppercase()
-                    else -> preview.statusText?.trim()?.takeIf { it.isNotBlank() }?.uppercase()
-                },
-                details = buildList {
-                    preview.languageText?.trim()?.takeIf { it.isNotBlank() }?.let(::add)
-                }
-            )
-        }
-
-        val secondaryHighlightText = secondaryMeta.highlightText
-        val ageRatingBadge = secondaryMeta.ageRating
-        val statusBadge = secondaryMeta.status
-        val secondaryDetails = secondaryMeta.details
-        val hasSecondaryBadge = ageRatingBadge != null || statusBadge != null
-        val hasImdbRatingForLayout = !preview.imdbText.isNullOrBlank()
-        val hasMdbListRatings = mdbListShowOnHero && preview.mdbListRatings != null && !preview.mdbListRatings.isEmpty()
-        // When MDBList ratings are shown, don't reserve space for standalone IMDb badge.
-        val reserveImdbInPrimary = !hasMdbListRatings && !preview.isSeries && !hasSecondaryBadge && hasImdbRatingForLayout
-        val reserveImdbInPrimaryWithHighlight = reserveImdbInPrimary && secondaryHighlightText == null
-        val reserveImdbInSecondary = !hasMdbListRatings && hasImdbRatingForLayout &&
-            (preview.isSeries || hasSecondaryBadge || secondaryHighlightText != null)
-        val showImdbInPrimaryWithHighlight = showImdbRatings && reserveImdbInPrimaryWithHighlight
-        val showImdbInSecondary = showImdbRatings && reserveImdbInSecondary
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .graphicsLayer { alpha = metaAlpha },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(metaSpacing)
-        ) {
-            val leadingMetaText = remember(preview.contentTypeText, preview.genres, context) {
-                buildList {
-                    preview.contentTypeText?.takeIf { it.isNotBlank() }?.let(::add)
-                    preview.genres.firstOrNull()?.takeIf { it.isNotBlank() }?.let { genre ->
-                        add(com.nuvio.tv.ui.util.localizedGenreLabel(context, genre))
-                    }
-                }.joinToString(separator = " • ")
+        Column(Modifier.graphicsLayer { alpha = metaAlpha }
+            .then(if (metaAlpha < 0.01f) Modifier.clearAndSetSemantics {} else Modifier),
+            verticalArrangement = Arrangement.spacedBy(if (shortViewport) 6.dp else if (compact) 8.dp else 12.dp)) {
+            if (contextLine.isNotBlank()) {
+                Text(contextLine, style = MaterialTheme.typography.labelMedium,
+                    color = colors.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            val hasLeadingMeta = leadingMetaText.isNotBlank()
-
-            val runtimeText = preview.runtimeText
-            val yearText = preview.yearText
-            val hasTrailingMeta = !runtimeText.isNullOrBlank() ||
-                !yearText.isNullOrBlank() ||
-                reserveImdbInPrimaryWithHighlight
-
-            if (hasLeadingMeta) {
-                Text(
-                    text = leadingMetaText,
-                    style = labelMedium,
-                    color = NuvioTheme.colors.TextSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = if (hasTrailingMeta) {
-                        Modifier.weight(1f, fill = false)
-                    } else {
-                        Modifier
+            if (secondary.isNotEmpty() || (compact && showImdbRatings && (imdb != null || preview.mdbListRatings?.isEmpty() == false))) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp), maxLines = if (compact) 1 else 2) {
+                    if (compact && showImdbRatings) {
+                        if (mdbListShowOnHero && preview.mdbListRatings?.isEmpty() == false) {
+                            com.nuvio.tv.ui.components.MDBListRatingsRow(ratings = preview.mdbListRatings!!,
+                                maxItems = 3, order = mdbListRatingOrder)
+                        } else if (imdb != null) {
+                            HeroImdbMeta(preview.imdbText.orEmpty(), MaterialTheme.typography.labelSmall,
+                                colors.TextSecondary, 14.dp, 4.dp)
+                        }
                     }
-                )
-            }
-
-            if (hasTrailingMeta) {
-                if (hasLeadingMeta) {
-                    HeroMetaDivider(metaScale)
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(metaSpacing)
-                ) {
-                    if (!runtimeText.isNullOrBlank()) {
-                        Text(
-                            text = runtimeText,
-                            style = labelMedium,
-                            color = NuvioTheme.colors.TextSecondary,
-                            maxLines = 1
-                        )
-                    }
-                    if (!runtimeText.isNullOrBlank() && !yearText.isNullOrBlank()) {
-                        HeroMetaDivider(metaScale)
-                    }
-                    if (!yearText.isNullOrBlank()) {
-                        Text(
-                            text = yearText,
-                            style = labelMedium,
-                            color = NuvioTheme.colors.TextSecondary,
-                            maxLines = 1
-                        )
-                    }
-                    if (reserveImdbInPrimaryWithHighlight) {
-                        HeroImdbMeta(
-                            imdbText = preview.imdbText.orEmpty(),
-                            textStyle = labelMedium,
-                            textColor = NuvioTheme.colors.TextSecondary,
-                            logoSize = NuvioTheme.spacing.xl * metaScale,
-                            spacing = imdbMetaSpacing,
-                            visible = showImdbInPrimaryWithHighlight
-                        )
+                    secondary.forEach { value ->
+                        Box(Modifier.clip(RoundedCornerShape(6.dp)).background(colors.TextPrimary.copy(alpha = 0.08f))
+                            .padding(horizontal = 7.dp, vertical = 3.dp)) {
+                            Text(value, style = MaterialTheme.typography.labelSmall,
+                                color = colors.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
                     }
                 }
             }
-        }
-
-        if (secondaryHighlightText != null || ageRatingBadge != null || reserveImdbInSecondary || statusBadge != null || secondaryDetails.isNotEmpty() || hasMdbListRatings) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .graphicsLayer { alpha = metaAlpha },
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(metaSpacing)
-            ) {
-                val semiBoldLabelMedium = remember(labelMedium) { labelMedium.copy(fontWeight = FontWeight.SemiBold) }
-        secondaryHighlightText?.let { text ->
-                    Text(
-                        text = text,
-                        style = semiBoldLabelMedium,
-                        color = NuvioTheme.colors.TextPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                if (secondaryHighlightText != null && (hasSecondaryBadge || reserveImdbInSecondary || secondaryDetails.isNotEmpty() || hasMdbListRatings)) {
-                    HeroMetaDivider(
-                        scale = metaScale,
-                        visible = hasSecondaryBadge || showImdbInSecondary || secondaryDetails.isNotEmpty() || hasMdbListRatings
-                    )
-                }
-                if (ageRatingBadge != null && statusBadge != null) {
-                    HeroCombinedMetaBadge(
-                        leftText = ageRatingBadge,
-                        rightText = statusBadge,
-                        textStyle = labelMedium,
-                        contentColor = NuvioTheme.colors.TextPrimary
-                    )
-                } else {
-                    ageRatingBadge?.let { badge ->
-                        HeroMetaBadge(
-                            text = badge,
-                            textStyle = labelMedium,
-                            contentColor = NuvioTheme.colors.TextPrimary
-                        )
-                    }
-                    statusBadge?.let { badge ->
-                        HeroMetaBadge(
-                            text = badge,
-                            textStyle = labelMedium,
-                            contentColor = NuvioTheme.colors.TextPrimary
-                        )
-                    }
-                }
-                if ((ageRatingBadge != null || statusBadge != null) && (reserveImdbInSecondary || secondaryDetails.isNotEmpty() || hasMdbListRatings)) {
-                    HeroMetaDivider(
-                        scale = metaScale,
-                        visible = showImdbInSecondary || secondaryDetails.isNotEmpty() || hasMdbListRatings
-                    )
-                }
-                if (reserveImdbInSecondary) {
-                    HeroImdbMeta(
-                        imdbText = preview.imdbText.orEmpty(),
-                        textStyle = labelMedium,
-                        textColor = NuvioTheme.colors.TextSecondary,
-                        logoSize = NuvioTheme.spacing.xl * metaScale,
-                        spacing = imdbMetaSpacing,
-                        visible = showImdbInSecondary
-                    )
-                }
-                if (reserveImdbInSecondary && secondaryDetails.isNotEmpty()) {
-                    HeroMetaDivider(
-                        scale = metaScale,
-                        visible = showImdbInSecondary
-                    )
-                }
-                secondaryDetails.forEachIndexed { index, value ->
-                    Text(
-                        text = value,
-                        style = labelMedium,
-                        color = NuvioTheme.colors.TextTertiary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (index < secondaryDetails.lastIndex) {
-                        HeroMetaDivider(metaScale)
-                    }
-                }
-                // MDBList ratings inline after other secondary meta.
-                if (showImdbRatings && hasMdbListRatings) {
-                    // Divider before MDBList ratings is already handled by the
-                    // badge/IMDb/details divider logic above — only add one
-                    // when IMDb or details were the last visible element.
-                    if (showImdbInSecondary || secondaryDetails.isNotEmpty()) {
-                        HeroMetaDivider(metaScale)
-                    }
-                    com.nuvio.tv.ui.components.MDBListRatingsRow(
-                        ratings = preview.mdbListRatings!!,
-                        maxItems = 3,
-                        order = mdbListRatingOrder
-                    )
+            if (showImdbRatings && !compact) {
+                if (mdbListShowOnHero && preview.mdbListRatings?.isEmpty() == false) {
+                    com.nuvio.tv.ui.components.MDBListRatingsRow(ratings = preview.mdbListRatings!!,
+                        maxItems = 3, order = mdbListRatingOrder)
+                } else if (imdb != null) {
+                    HeroImdbMeta(preview.imdbText.orEmpty(), MaterialTheme.typography.labelMedium,
+                        colors.TextSecondary, 16.dp, 6.dp)
                 }
             }
-        }
-
-        preview.description?.takeIf { it.isNotBlank() }?.let { description ->
-            Text(
-                text = description,
-                style = scaledDescriptionStyle.copy(textDirection = description.contentTextDirection()),
-                color = NuvioTheme.colors.TextPrimary,
-                maxLines = descriptionMaxLines,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.graphicsLayer { alpha = metaAlpha }
-            )
+            preview.description?.takeIf(String::isNotBlank)?.let {
+                Text(it, style = MaterialTheme.typography.bodyMedium.copy(textDirection = it.contentTextDirection()),
+                    color = colors.TextSecondary, maxLines = if (compact) 1 else 2,
+                    overflow = TextOverflow.Ellipsis)
+            }
         }
     }
 }
-
 @Composable
 private fun HeroImdbMeta(
     imdbText: String,
@@ -690,87 +475,4 @@ private fun HeroImdbMeta(
             overflow = TextOverflow.Ellipsis
         )
     }
-}
-
-@Composable
-private fun HeroCombinedMetaBadge(
-    leftText: String,
-    rightText: String,
-    textStyle: androidx.compose.ui.text.TextStyle,
-    contentColor: Color
-) {
-    val dividerColor = contentColor.copy(alpha = 0.55f)
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .border(
-                border = BorderStroke(NuvioTheme.spacing.hairline, dividerColor),
-                shape = RoundedCornerShape(6.dp)
-            )
-            .padding(horizontal = NuvioTheme.spacing.sm, vertical = NuvioTheme.spacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm)
-    ) {
-        val semiBoldStyle = remember(textStyle) { textStyle.copy(fontWeight = FontWeight.SemiBold) }
-        Text(
-            text = leftText,
-            style = semiBoldStyle,
-            color = contentColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Box(
-            modifier = Modifier
-                .width(NuvioTheme.spacing.hairline)
-                .height(NuvioTheme.spacing.md)
-                .background(dividerColor)
-        )
-        Text(
-            text = rightText,
-            style = semiBoldStyle,
-            color = contentColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
-private fun HeroMetaBadge(
-    text: String,
-    textStyle: androidx.compose.ui.text.TextStyle,
-    contentColor: Color
-) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .border(
-                border = BorderStroke(NuvioTheme.spacing.hairline, contentColor.copy(alpha = 0.55f)),
-                shape = RoundedCornerShape(6.dp)
-            )
-            .padding(horizontal = NuvioTheme.spacing.sm, vertical = NuvioTheme.spacing.xs),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            style = remember(textStyle) { textStyle.copy(fontWeight = FontWeight.SemiBold) },
-            color = contentColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
-private fun HeroMetaDivider(
-    scale: Float,
-    visible: Boolean = true
-) {
-    Box(
-        modifier = Modifier
-            .size((NuvioTheme.spacing.xs * scale).coerceAtLeast(NuvioTheme.spacing.xxs))
-            .clip(RoundedCornerShape(percent = 50))
-            .graphicsLayer { alpha = if (visible) 1f else 0f }
-            .background(NuvioTheme.colors.TextTertiary.copy(alpha = 0.78f))
-    )
 }
