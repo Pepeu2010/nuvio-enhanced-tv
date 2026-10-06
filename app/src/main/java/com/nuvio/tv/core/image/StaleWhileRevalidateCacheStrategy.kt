@@ -30,6 +30,7 @@ import java.util.concurrent.ConcurrentHashMap
 class StaleWhileRevalidateCacheStrategy(
     private val revalidationClient: () -> OkHttpClient,
     private val imageLoaderProvider: () -> ImageLoader,
+    private val writesEnabled: () -> Boolean = { true },
 ) : CacheStrategy {
 
     companion object {
@@ -53,7 +54,7 @@ class StaleWhileRevalidateCacheStrategy(
         val url = networkRequest.url
         val lastRevalidated = revalidatedAt[url]
         val now = System.currentTimeMillis()
-        if (lastRevalidated == null || (now - lastRevalidated) > REVALIDATION_COOLDOWN_MS) {
+        if (writesEnabled() && (lastRevalidated == null || (now - lastRevalidated) > REVALIDATION_COOLDOWN_MS)) {
             scheduleBackgroundRevalidation(url, cacheResponse)
         }
         return CacheStrategy.ReadResult(cacheResponse)
@@ -90,14 +91,14 @@ class StaleWhileRevalidateCacheStrategy(
                             evictFromDiskCache(url)
                             ImageInvalidationBus.notifyInvalidated(url)
                         }
-                        else -> Log.w(TAG, "Revalidation ${response.code}: ${url.take(80)}")
+                        else -> Log.w(TAG, "Revalidation HTTP ${response.code}")
                     }
                 } finally {
                     response.close()
                 }
             } catch (e: Exception) {
                 if (e !is kotlinx.coroutines.CancellationException) {
-                    Log.w(TAG, "Revalidation error: ${url.take(80)} - ${e.message}")
+                    Log.w(TAG, "Revalidation unavailable")
                 }
             } finally {
                 revalidatingUrls.remove(url)

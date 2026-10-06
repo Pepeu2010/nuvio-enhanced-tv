@@ -5,4 +5,13 @@
     <string name="player_timeline_credits">Créditos</string>
     <string name="player_timeline_post_credits">Pós-créditos</string>
     <string name="player_seek_position">Posição de reprodução</string>
+    <string name="telumia_cache_title">Cache de mídia</string>
+    <string name="telumia_cache_auto">Cache automático</string>
+    <string name="telumia_cache_auto_description">Adapta ao armazenamento disponível e à memória do aparelho.</string>
+    <string name="telumia_cache_manual">Orçamento manual</string>
+    <string name="telumia_cache_manual_description">Use esquerda/direita para escolher o orçamento deste aparelho.</string>
+    <string name="telumia_cache_active">Orçamento atual: %1$d MiB</string>
+    <string name="telumia_cache_restart">As alterações valem na próxima abertura. Downloads, histórico e bookmarks são separados.</string>
+    <string name="telumia_cache_save_error">Não foi possível salvar a preferência de cache. Tente novamente.</string>
+    <string name="telumia_cache_saving">Salvando preferência de cache…</string>
 </resources>

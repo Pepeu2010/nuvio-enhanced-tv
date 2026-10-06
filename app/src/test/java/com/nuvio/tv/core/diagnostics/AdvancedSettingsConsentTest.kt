@@ -3,6 +3,7 @@ package com.nuvio.tv.core.diagnostics
 import androidx.lifecycle.ViewModelStore
 import com.nuvio.tv.MainDispatcherRule
 import com.nuvio.tv.core.runtime.AppRestarter
+import com.nuvio.tv.core.storage.*
 import com.nuvio.tv.data.local.DeviceLocalPlayerPreferences
 import com.nuvio.tv.data.local.ImagePerformancePreferences
 import com.nuvio.tv.data.local.LayoutPreferenceDataStore
@@ -48,7 +49,11 @@ class AdvancedSettingsConsentTest {
         val images = mockk<ImagePerformancePreferences> {
             every { rgb565Enabled } returns true
         }
-        val viewModel = AdvancedSettingsViewModel(layout, players, device, reports, images, mockk<AppRestarter>())
+        val cache = mockk<TvMediaCache> {
+            every { loadSettings() } returns MediaCacheSettings()
+            every { activeBudget } returns MediaCacheBudget(256L * MIB, 256L * MIB, emptySet())
+        }
+        val viewModel = AdvancedSettingsViewModel(layout, players, device, reports, images, mockk<AppRestarter>(), cache)
         val store = ViewModelStore().apply { put("settings", viewModel) }
         try {
             assertFalse(viewModel.uiState.value.sentryEnabled)

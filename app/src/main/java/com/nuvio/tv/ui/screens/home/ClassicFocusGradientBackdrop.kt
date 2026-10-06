@@ -209,7 +209,7 @@ private suspend fun resolveArtworkColor(
             .data(imageUrl)
             .allowHardware(false)
             .memoryCachePolicy(CachePolicy.ENABLED)
-            .diskCachePolicy(CachePolicy.ENABLED)
+            .diskCachePolicy(com.nuvio.tv.core.storage.tvMediaCache(context).requestPolicy)
             .networkCachePolicy(CachePolicy.DISABLED)
             .size(Size(72, 72))
             .build()

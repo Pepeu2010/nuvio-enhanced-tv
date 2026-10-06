@@ -219,7 +219,7 @@ fun CustomProfileBackgroundImage(
             .data(imageUrl)
             .memoryCacheKey("custom-profile-background-$imageUrl")
             .diskCacheKey("custom-profile-background-$imageUrl")
-            .diskCachePolicy(CachePolicy.ENABLED)
+            .diskCachePolicy(com.nuvio.tv.core.storage.tvMediaCache(context).requestPolicy)
             .allowRgb565(false)
             .crossfade(true)
             .build(),

@@ -32,6 +32,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.nuvio.tv.R
+import com.nuvio.tv.NuvioApplication
+import com.nuvio.tv.core.storage.TvMediaCache
+import com.nuvio.tv.core.storage.MediaCacheCategory
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.disk.DiskCache
@@ -55,15 +58,17 @@ import kotlin.math.round
  *
  * The cache is keyed by the Coil memory-cache key (url + dimensions) and is
  * bounded by the number of unique badge images (typically 10-30 in practice).
- * Entries are never evicted — they live for the process lifetime which is fine
- * because they hold no bitmaps, only request metadata.
+ * Request metadata is bounded even when providers return many distinct badges.
  */
-private val badgeImageRequestCache = HashMap<String, ImageRequest>(32)
+private val badgeImageRequestCache = object : LinkedHashMap<String, ImageRequest>(32, 0.75f, true) {
+    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ImageRequest>?): Boolean = size > 256
+}
 
 private var badgeImageLoader: ImageLoader? = null
 
 private fun getBadgeImageLoader(context: android.content.Context): ImageLoader {
     badgeImageLoader?.let { return it }
+    val cache = badgeMediaCache(context)
     val loader = ImageLoader.Builder(context.applicationContext)
         .memoryCache {
             MemoryCache.Builder()
@@ -73,9 +78,10 @@ private fun getBadgeImageLoader(context: android.content.Context): ImageLoader {
         .diskCache {
             DiskCache.Builder()
                 .directory(context.applicationContext.cacheDir.resolve("badge_cache").toOkioPath())
-                .maxSizeBytes(50L * 1024 * 1024)
+                .maxSizeBytes(cache.coilQuota(MediaCacheCategory.BADGES))
                 .build()
         }
+        .diskCachePolicy(cache.requestPolicy)
         .precision(Precision.INEXACT)
         .crossfade(false)
         .allowHardware(true)
@@ -84,6 +90,9 @@ private fun getBadgeImageLoader(context: android.content.Context): ImageLoader {
     badgeImageLoader = loader
     return loader
 }
+
+private fun badgeMediaCache(context: android.content.Context): TvMediaCache =
+    (context.applicationContext as? NuvioApplication)?.mediaCache ?: TvMediaCache(context.applicationContext)
 
 /** Shared shape instance — all badge chips use the same corner radius. */
 private val BadgeChipShape = RoundedCornerShape(6.dp)
@@ -201,7 +210,7 @@ private fun StreamImportedBadgeChip(badge: StreamBadge, crossfade: Boolean = fal
                 .memoryCacheKey(cacheKey)
                 .diskCacheKey(badge.imageURL)
                 .memoryCachePolicy(CachePolicy.ENABLED)
-                .diskCachePolicy(CachePolicy.ENABLED)
+                .diskCachePolicy(badgeMediaCache(context).requestPolicy)
                 .crossfade(false)
                 .build()
         }

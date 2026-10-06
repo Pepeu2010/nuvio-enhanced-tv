@@ -3,6 +3,9 @@ package com.nuvio.tv.ui.screens.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nuvio.tv.core.runtime.AppRestarter
+import com.nuvio.tv.core.storage.TvMediaCache
+import com.nuvio.tv.core.storage.MediaCacheSettings
+import com.nuvio.tv.core.storage.MediaCacheBudget
 import com.nuvio.tv.data.local.DeviceLocalPlayerPreferences
 import com.nuvio.tv.data.local.ImagePerformancePreferences
 import com.nuvio.tv.data.local.LayoutPreferenceDataStore
@@ -24,7 +27,11 @@ data class AdvancedSettingsUiState(
     val playbackIssueReportsEnabled: Boolean = false,
     val playerStatsHudEnabled: Boolean = false,
     val rgb565Enabled: Boolean = true,
-    val sentryEnabled: Boolean = false
+    val sentryEnabled: Boolean = false,
+    val cacheSettings: MediaCacheSettings = MediaCacheSettings(),
+    val cacheBudget: MediaCacheBudget = MediaCacheBudget(0, 0, emptySet()),
+    val cacheSaveFailed: Boolean = false,
+    val cacheSaving: Boolean = false
 )
 
 sealed class AdvancedSettingsEvent {
@@ -35,6 +42,7 @@ sealed class AdvancedSettingsEvent {
     data class SetPlayerStatsHudEnabled(val enabled: Boolean) : AdvancedSettingsEvent()
     data class SetRgb565Enabled(val enabled: Boolean) : AdvancedSettingsEvent()
     data class SetSentryEnabled(val enabled: Boolean) : AdvancedSettingsEvent()
+    data class SetMediaCache(val settings: MediaCacheSettings) : AdvancedSettingsEvent()
 }
 
 @HiltViewModel
@@ -44,13 +52,15 @@ class AdvancedSettingsViewModel @Inject constructor(
     private val deviceLocalPlayerPreferences: DeviceLocalPlayerPreferences,
     private val sentrySettingsDataStore: SentrySettingsDataStore,
     private val imagePerformancePreferences: ImagePerformancePreferences,
-    private val appRestarter: AppRestarter
+    private val appRestarter: AppRestarter,
+    private val mediaCache: TvMediaCache
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AdvancedSettingsUiState())
     val uiState: StateFlow<AdvancedSettingsUiState> = _uiState.asStateFlow()
 
     init {
         _uiState.update { it.copy(rgb565Enabled = imagePerformancePreferences.rgb565Enabled) }
+        _uiState.update { it.copy(cacheSettings = mediaCache.loadSettings(), cacheBudget = mediaCache.activeBudget) }
         viewModelScope.launch {
             layoutPreferenceDataStore.fastHorizontalNavigationEnabled.collectLatest { enabled ->
                 _uiState.update { it.copy(fastHorizontalNavigationEnabled = enabled) }
@@ -85,6 +95,14 @@ class AdvancedSettingsViewModel @Inject constructor(
 
     fun onEvent(event: AdvancedSettingsEvent) {
         when (event) {
+            is AdvancedSettingsEvent.SetMediaCache -> {
+                if (_uiState.value.cacheSaving) return
+                _uiState.update { it.copy(cacheSaving = true, cacheSaveFailed = false) }
+                viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    val saved = runCatching { mediaCache.saveSettings(event.settings) }.getOrDefault(false)
+                    _uiState.update { it.copy(cacheSettings = if (saved) event.settings else it.cacheSettings, cacheSaveFailed = !saved, cacheSaving = false) }
+                }
+            }
             is AdvancedSettingsEvent.SetFastHorizontalNavigationEnabled -> {
                 viewModelScope.launch {
                     layoutPreferenceDataStore.setFastHorizontalNavigationEnabled(event.enabled)

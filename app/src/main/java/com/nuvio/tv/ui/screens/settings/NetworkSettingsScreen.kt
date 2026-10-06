@@ -477,6 +477,14 @@ fun AdvancedSettingsContent(
             }
         }
 
+        item(key = "media_cache_settings") {
+            SettingsGroupCard(title = stringResource(R.string.telumia_cache_title)) {
+                MediaCacheSettingsRows(uiState.cacheSettings, uiState.cacheBudget, uiState.cacheSaveFailed, uiState.cacheSaving) {
+                    viewModel.onEvent(AdvancedSettingsEvent.SetMediaCache(it))
+                }
+            }
+        }
+
         item(key = "startup_settings") {
             SettingsGroupCard(
                 modifier = Modifier.fillMaxWidth(),

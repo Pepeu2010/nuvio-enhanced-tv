@@ -3380,4 +3380,13 @@
     <string name="player_timeline_credits">Credits</string>
     <string name="player_timeline_post_credits">Post-credits</string>
     <string name="player_seek_position">Playback position</string>
+    <string name="telumia_cache_title">Media cache</string>
+    <string name="telumia_cache_auto">Automatic cache</string>
+    <string name="telumia_cache_auto_description">Adapts to available storage and device memory.</string>
+    <string name="telumia_cache_manual">Manual budget</string>
+    <string name="telumia_cache_manual_description">Use left/right to choose a device-local budget.</string>
+    <string name="telumia_cache_active">Current budget: %1$d MiB</string>
+    <string name="telumia_cache_restart">Changes apply at the next launch. Downloads, history and bookmarks are separate.</string>
+    <string name="telumia_cache_save_error">Could not save the cache preference. Try again.</string>
+    <string name="telumia_cache_saving">Saving cache preference…</string>
 </resources>

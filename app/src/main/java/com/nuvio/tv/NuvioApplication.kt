@@ -9,6 +9,8 @@ import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import com.nuvio.tv.core.image.CustomPosterFallbackInterceptor
 import coil3.disk.DiskCache
+import com.nuvio.tv.core.storage.TvMediaCache
+import com.nuvio.tv.core.storage.MediaCacheCategory
 import coil3.memory.MemoryCache
 import coil3.gif.GifDecoder
 import coil3.gif.AnimatedImageDecoder
@@ -39,6 +41,7 @@ import javax.inject.Inject
 
 @HiltAndroidApp
 class NuvioApplication : Application(), SingletonImageLoader.Factory {
+    @Inject lateinit var mediaCache: TvMediaCache
 
     @Inject lateinit var startupSyncService: StartupSyncService
     @Inject lateinit var androidTvChannelSyncService: AndroidTvChannelSyncService
@@ -132,6 +135,7 @@ class NuvioApplication : Application(), SingletonImageLoader.Factory {
                             StaleWhileRevalidateCacheStrategy(
                                 revalidationClient = { imageOkHttpClient },
                                 imageLoaderProvider = imageLoaderRef,
+                                writesEnabled = { mediaCache.writesEnabled },
                             )
                         },
                     )
@@ -159,9 +163,10 @@ class NuvioApplication : Application(), SingletonImageLoader.Factory {
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache").toOkioPath())
-                    .maxSizeBytes(200L * 1024 * 1024)
+                    .maxSizeBytes(mediaCache.coilQuota(MediaCacheCategory.IMAGES))
                     .build()
             }
+            .diskCachePolicy(mediaCache.requestPolicy)
             .crossfade(false)
             .precision(coil3.size.Precision.INEXACT)
             .allowHardware(false)
