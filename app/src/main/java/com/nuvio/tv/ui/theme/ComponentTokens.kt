@@ -64,6 +64,18 @@ data class NuvioSettingsComponentTokens(
 )
 
 @Immutable
+data class NuvioLiveTvComponentTokens(
+    val channelWidth: Dp = 156.dp,
+    val rowHeight: Dp = 80.dp,
+    val programWidth: Dp = 216.dp,
+    val cornerRadius: Dp = 12.dp,
+    val contentPadding: Dp = 12.dp,
+    val itemSpacing: Dp = 12.dp,
+    val progressHeight: Dp = 4.dp,
+    val focusedBorderWidth: Dp = 3.dp,
+)
+
+@Immutable
 data class NuvioComponentTokens(
     val posterCard: NuvioCardComponentTokens,
     val backdropCard: NuvioCardComponentTokens,
@@ -79,7 +91,8 @@ data class NuvioComponentTokens(
     val buttonHeight: Dp,
     val chipHeight: Dp,
     val badgeHeight: Dp,
-    val skeletonCornerRadius: Dp
+    val skeletonCornerRadius: Dp,
+    val liveTv: NuvioLiveTvComponentTokens = NuvioLiveTvComponentTokens(),
 )
 
 object NuvioComponents {
