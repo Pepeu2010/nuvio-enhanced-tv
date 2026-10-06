@@ -504,7 +504,14 @@ class PlayerRuntimeController(
     internal var pendingBackgroundCrashRecovery: Boolean = false
     internal var backgroundCrashSavedPositionMs: Long = 0L
 
+    internal var skipMetadataLoadJob: Job? = null
     internal var skipIntervals: List<SkipInterval> = emptyList()
+        set(value) {
+            field = value
+            _uiState.update { state -> state.copy(timedMetadata = if (value.isEmpty()) null else
+                com.nuvio.tv.core.player.metadata.skipTimedMetadata(
+                    com.nuvio.tv.core.player.metadata.TimedMetadataScope(contentId.orEmpty(), contentType.orEmpty(), currentVideoId ?: contentId.orEmpty()), value, 0L)) }
+        }
     internal var skipIntroEnabled: Boolean = true
     internal var parentalGuideEnabled: Boolean = false
     internal var autoSkipSegmentTypes: Set<AutoSkipSegmentType> = emptySet()

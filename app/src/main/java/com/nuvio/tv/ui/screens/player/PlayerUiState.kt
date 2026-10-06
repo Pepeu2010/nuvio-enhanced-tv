@@ -175,6 +175,7 @@ data class PlayerUiState(
     val showParentalGuide: Boolean = false,
     val parentalGuideHasShown: Boolean = false,
     // Skip intro
+    val timedMetadata: com.nuvio.tv.core.player.metadata.TimedMetadataTimeline? = null,
     val activeSkipInterval: SkipInterval? = null,
     val activeSkipTargetsPostCredits: Boolean = false,
     val skipIntervalDismissed: Boolean = false,

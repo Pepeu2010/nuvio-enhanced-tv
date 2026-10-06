@@ -3375,4 +3375,9 @@
     <string name="enhanced_intensity_subtle">Subtle</string>
     <string name="enhanced_intensity_standard">Standard</string>
     <string name="enhanced_intensity_cinematic">Cinematic</string>
+    <string name="player_timeline_intro">Intro</string>
+    <string name="player_timeline_recap">Recap</string>
+    <string name="player_timeline_credits">Credits</string>
+    <string name="player_timeline_post_credits">Post-credits</string>
+    <string name="player_seek_position">Playback position</string>
 </resources>

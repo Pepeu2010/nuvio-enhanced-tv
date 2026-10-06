@@ -3187,4 +3187,9 @@
     <string name="enhanced_intensity_subtle">Sutil</string>
     <string name="enhanced_intensity_standard">Padrão</string>
     <string name="enhanced_intensity_cinematic">Cinemática</string>
+    <string name="player_timeline_intro">Abertura</string>
+    <string name="player_timeline_recap">Recapitulação</string>
+    <string name="player_timeline_credits">Créditos</string>
+    <string name="player_timeline_post_credits">Pós-créditos</string>
+    <string name="player_seek_position">Posição de reprodução</string>
 </resources>

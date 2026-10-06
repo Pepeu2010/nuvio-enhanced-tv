@@ -19,6 +19,7 @@ internal fun PlayerRuntimeController.releasePlayer(flushPlaybackState: Boolean) 
 
     notifyAudioSessionUpdate(false)
     unregisterAudioDelayRouteCallback()
+    skipMetadataLoadJob?.cancel()
     audioRouteChangeJob?.cancel()
     audioRouteChangeJob = null
 

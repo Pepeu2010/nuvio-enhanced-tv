@@ -481,6 +481,7 @@ internal fun PlayerRuntimeController.observeSubtitleSettings() {
             }
 
             if (!skipIntroEnabled) {
+                skipMetadataLoadJob?.cancel()
                 if (skipIntervals.isNotEmpty() || _uiState.value.activeSkipInterval != null) {
                     skipIntervals = emptyList()
                     skipIntroFetchedKey = null
@@ -614,10 +615,8 @@ internal fun PlayerRuntimeController.fetchSkipIntervals(id: String?, season: Int
         val key = "movie:$id:$effectiveId"
         if (skipIntroFetchedKey == key) return
         skipIntroFetchedKey = key
-        scope.launch {
-            skipIntervals = withTimeoutOrNull(15_000L) {
+        launchSkipMetadataLoad(key) {
                 skipIntroRepository.getMovieSkipIntervals(id, effectiveId)
-            } ?: emptyList()
         }
         return
     }
@@ -636,10 +635,8 @@ internal fun PlayerRuntimeController.fetchSkipIntervals(id: String?, season: Int
         if (skipIntroFetchedKey == key) return
         skipIntroFetchedKey = key
         val imdbId = id?.takeIf { it.startsWith("tt") } ?: metaImdbId
-        scope.launch {
-            skipIntervals = withTimeoutOrNull(15_000L) {
+        launchSkipMetadataLoad(key) {
                 skipIntroRepository.getSkipIntervalsForMal(malId, malEpisode, imdbId = imdbId, imdbSeason = season, imdbEpisode = episode)
-            } ?: emptyList()
         }
         return
     }
@@ -653,10 +650,8 @@ internal fun PlayerRuntimeController.fetchSkipIntervals(id: String?, season: Int
         if (skipIntroFetchedKey == key) return
         skipIntroFetchedKey = key
         val imdbId = id?.takeIf { it.startsWith("tt") } ?: metaImdbId
-        scope.launch {
-            skipIntervals = withTimeoutOrNull(15_000L) {
+        launchSkipMetadataLoad(key) {
                 skipIntroRepository.getSkipIntervalsForKitsu(kitsuId, kitsuEpisode, imdbId = imdbId, imdbSeason = season, imdbEpisode = episode)
-            } ?: emptyList()
         }
         return
     }
@@ -668,10 +663,19 @@ internal fun PlayerRuntimeController.fetchSkipIntervals(id: String?, season: Int
     if (skipIntroFetchedKey == key) return
     skipIntroFetchedKey = key
 
-    scope.launch {
-        skipIntervals = withTimeoutOrNull(15_000L) {
+    launchSkipMetadataLoad(key) {
             skipIntroRepository.getSkipIntervals(imdbId, season, episode)
-        } ?: emptyList()
+    }
+}
+
+/** A late response from the previous episode/source cannot replace the current timed snapshot. */
+private fun PlayerRuntimeController.launchSkipMetadataLoad(key: String, loader: suspend () -> List<com.nuvio.tv.data.repository.SkipInterval>) {
+    skipMetadataLoadJob?.cancel()
+    skipIntervals = emptyList()
+    val requestedVideo = currentVideoId
+    skipMetadataLoadJob = scope.launch {
+        val loaded = withTimeoutOrNull(15_000L) { loader() } ?: emptyList()
+        if (skipIntroEnabled && skipIntroFetchedKey == key && currentVideoId == requestedVideo) skipIntervals = loaded
     }
 }
 
