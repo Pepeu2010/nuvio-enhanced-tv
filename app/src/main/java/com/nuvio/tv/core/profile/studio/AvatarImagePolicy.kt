@@ -16,6 +16,7 @@ internal data class AvatarCrop(val centerX: Float = .5f, val centerY: Float = .5
 internal object AvatarImagePolicy {
     const val MAX_INPUT_BYTES = 10 * 1024 * 1024
     const val MAX_PIXELS = 16L * 1024 * 1024
+    const val MAX_WORKING_PIXELS = 4L * 1024 * 1024
     val variantSizes = listOf(64, 128, 256, 512)
     val rasterMimeTypes = setOf("image/png", "image/jpeg", "image/gif", "image/bmp", "image/x-ms-bmp", "image/webp")
 
@@ -28,6 +29,13 @@ internal object AvatarImagePolicy {
     fun checkBytes(bytes: ByteArray) {
         if (bytes.isEmpty()) throw AvatarImageException(AvatarImageFailure.EMPTY)
         if (bytes.size > MAX_INPUT_BYTES) throw AvatarImageException(AvatarImageFailure.TOO_LARGE)
+    }
+
+    fun sampleSize(width: Int, height: Int): Int {
+        checkDimensions(width, height)
+        var sample = 1
+        while (((width.toLong() + sample - 1) / sample) * ((height.toLong() + sample - 1) / sample) > MAX_WORKING_PIXELS) sample *= 2
+        return sample
     }
 
     fun readBounded(stream: InputStream): ByteArray {

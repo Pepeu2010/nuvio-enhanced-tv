@@ -16,10 +16,10 @@ import kotlin.math.roundToInt
 internal class AvatarRasterSource internal constructor(internal val bitmap: Bitmap) : AutoCloseable {
     val width: Int get() = bitmap.width
     val height: Int get() = bitmap.height
-    override fun close() { if (!bitmap.isRecycled) bitmap.recycle() }
+    override fun close() = synchronized(this) { if (!bitmap.isRecycled) bitmap.recycle() }
 }
 
-/** Android counterpart of the Desktop pipeline; used by the forthcoming existing-profile editor. */
+/** Bounded Android raster import for the existing profile editor. */
 internal object AvatarRasterPipeline {
     fun readContent(resolver: ContentResolver, uri: Uri): AvatarRasterSource {
         // Only explicit document/clipboard grants. No arbitrary filesystem or network URL import.
@@ -39,7 +39,11 @@ internal object AvatarRasterPipeline {
             if (bounds.outMimeType !in AvatarImagePolicy.rasterMimeTypes)
                 throw AvatarImageException(AvatarImageFailure.UNSUPPORTED)
             AvatarImagePolicy.checkDimensions(bounds.outWidth, bounds.outHeight)
-            val options = BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.ARGB_8888; inMutable = true }
+            val options = BitmapFactory.Options().apply {
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+                inMutable = true
+                inSampleSize = AvatarImagePolicy.sampleSize(bounds.outWidth, bounds.outHeight)
+            }
             decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
                 ?: throw AvatarImageException(AvatarImageFailure.INVALID)
             AvatarImagePolicy.checkDimensions(decoded.width, decoded.height)
@@ -60,7 +64,7 @@ internal object AvatarRasterPipeline {
     fun variants(source: AvatarRasterSource, crop: AvatarCrop): Map<Int, ByteArray> =
         AvatarImagePolicy.variantSizes.associateWith { render(source, crop, it) }
 
-    private fun render(source: AvatarRasterSource, crop: AvatarCrop, size: Int): ByteArray {
+    private fun render(source: AvatarRasterSource, crop: AvatarCrop, size: Int): ByteArray = synchronized(source) {
         if (source.bitmap.isRecycled) throw AvatarImageException(AvatarImageFailure.INVALID)
         val normalized = crop.validated()
         val side = (minOf(source.width, source.height) / normalized.zoom).roundToInt().coerceAtLeast(1)
@@ -70,7 +74,7 @@ internal object AvatarRasterPipeline {
         try {
             Canvas(output).drawBitmap(source.bitmap, Rect(x, y, x + side, y + side), Rect(0, 0, size, size),
                 Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
-            return ByteArrayOutputStream().use { stream ->
+            ByteArrayOutputStream().use { stream ->
                 if (!output.compress(Bitmap.CompressFormat.PNG, 100, stream)) throw AvatarImageException(AvatarImageFailure.INVALID)
                 stream.toByteArray()
             }

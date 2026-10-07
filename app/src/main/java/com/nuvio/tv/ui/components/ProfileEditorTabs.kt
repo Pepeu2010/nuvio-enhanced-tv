@@ -29,6 +29,7 @@ import com.nuvio.tv.R
 import com.nuvio.tv.ui.theme.NuvioTheme
 
 enum class ProfileEditorTab {
+    Studio,
     Avatar,
     Background
 }
@@ -38,21 +39,30 @@ fun ProfileEditorTabs(
     selectedTab: ProfileEditorTab,
     showBackgroundTab: Boolean,
     onTabSelected: (ProfileEditorTab) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm)
     ) {
         ProfileEditorTabItem(
+            label = stringResource(R.string.studio_avatar_tab),
+            isSelected = selectedTab == ProfileEditorTab.Studio,
+            enabled = enabled,
+            onClick = { onTabSelected(ProfileEditorTab.Studio) }
+        )
+        ProfileEditorTabItem(
             label = stringResource(R.string.profile_editor_tab_avatar),
             isSelected = selectedTab == ProfileEditorTab.Avatar,
+            enabled = enabled,
             onClick = { onTabSelected(ProfileEditorTab.Avatar) }
         )
         if (showBackgroundTab) {
             ProfileEditorTabItem(
                 label = stringResource(R.string.profile_editor_tab_background),
                 isSelected = selectedTab == ProfileEditorTab.Background,
+                enabled = enabled,
                 onClick = { onTabSelected(ProfileEditorTab.Background) }
             )
         }
@@ -63,21 +73,22 @@ fun ProfileEditorTabs(
 private fun ProfileEditorTabItem(
     label: String,
     isSelected: Boolean,
+    enabled: Boolean,
     onClick: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
     val backgroundColor by animateColorAsState(
         targetValue = when {
-            isFocused -> NuvioTheme.colors.FocusBackground
-            isSelected -> NuvioTheme.colors.Secondary.copy(alpha = 0.22f)
-            else -> Color.White.copy(alpha = 0.06f)
+            isFocused -> Color(0xFFE6BD75)
+            isSelected -> Color(0xFF3A3021)
+            else -> Color(0xFF1A2637)
         },
         animationSpec = tween(120),
         label = "profileEditorTabBackground"
     )
     val textColor by animateColorAsState(
-        targetValue = if (isSelected || isFocused) Color.White else NuvioTheme.colors.TextSecondary,
+        targetValue = if (isFocused) Color(0xFF0D1522) else Color(0xFFF5EFDF).copy(alpha = if(enabled)1f else .4f),
         animationSpec = tween(120),
         label = "profileEditorTabText"
     )
@@ -93,14 +104,15 @@ private fun ProfileEditorTabItem(
             .background(backgroundColor)
             .border(
                 border = if (isFocused) {
-                    NuvioTheme.focusRing.border(2.dp)
+                    BorderStroke(2.dp,Color(0xFFE6BD75))
                 } else {
-                    BorderStroke(1.dp, if (isSelected) NuvioTheme.colors.Secondary else NuvioTheme.colors.Border)
+                    BorderStroke(1.dp, if (isSelected) Color(0xFFE6BD75) else Color(0xFF26354B))
                 },
                 shape = shape
             )
             .onFocusChanged { isFocused = it.isFocused }
             .clickable(
+                enabled = enabled,
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick

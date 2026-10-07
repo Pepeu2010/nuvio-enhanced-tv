@@ -51,7 +51,9 @@ class ProfileSelectionViewModel @Inject constructor(
     private val profileBackgroundRepository: ProfileBackgroundRepository,
     memberAccessRepository: MemberAccessRepository,
     private val profileLockStateDataStore: ProfileLockStateDataStore,
-    private val themeDataStore: com.nuvio.tv.data.local.ThemeDataStore
+    private val themeDataStore: com.nuvio.tv.data.local.ThemeDataStore,
+    private val authManager: com.nuvio.tv.core.auth.AuthManager,
+    private val studioAvatars: com.nuvio.tv.core.profile.studio.ProfileStudioAvatarRepository
 ) : ViewModel() {
     val activeProfileId: StateFlow<Int> = profileManager.activeProfileId
     val profiles: StateFlow<List<UserProfile>> = profileManager.profiles
@@ -195,7 +197,8 @@ class ProfileSelectionViewModel @Inject constructor(
                 val profile = profileManager.createProfile(
                     name = name,
                     avatarColorHex = avatarColorHex,
-                    avatarId = avatarId
+                    avatarId = avatarId,
+                    studioOwnerId = (authManager.authState.value as? com.nuvio.tv.domain.model.AuthState.FullAccount)?.userId
                 )
                 if (profile != null) {
                     profileSyncService.pushToRemote()
@@ -245,20 +248,30 @@ class ProfileSelectionViewModel @Inject constructor(
         }
     }
 
-    fun updateProfile(profile: UserProfile) {
+    fun updateProfile(profile: UserProfile, onComplete: (Boolean) -> Unit = {}) {
         if (_isSaving.value) return
         viewModelScope.launch {
             _isSaving.value = true
-            profileManager.updateProfile(profile)
-            profileSyncService.pushToRemote()
-            refreshProfilePinStates()
-            _isSaving.value = false
+            val success = try {
+                val saved = profileManager.updateProfile(profile)
+                if (saved) { profileSyncService.pushToRemote();refreshProfilePinStates() }
+                saved
+            } catch (error: CancellationException) { throw error }
+            catch (_: Exception) { false }
+            finally { _isSaving.value = false }
+            onComplete(success)
         }
     }
 
     fun deleteProfile(id: Int) {
         viewModelScope.launch {
-            profileManager.deleteProfile(id)
+            val previous = profiles.value.firstOrNull { it.id == id }
+            val auth = authManager.authState.value
+            if (!profileManager.deleteProfile(id)) return@launch
+            if (previous != null) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                // A cleanup failure must not undo the confirmed deletion or delete another profile's files.
+                runCatching { studioAvatars.reset(previous,auth) }
+            }
             profileSyncService.deleteProfileData(id)
             profileSyncService.pushToRemote()
             refreshProfilePinStates()

@@ -6,11 +6,20 @@
     <!-- https://stackoverflow.com/questions/64319117/speechrecognizer-not-available-when-targeting-android-11 -->
     <queries>
         <intent>
+            <action android:name="android.intent.action.OPEN_DOCUMENT" />
+            <category android:name="android.intent.category.OPENABLE" />
+            <data android:mimeType="image/*" />
+        </intent>
+        <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>
     </queries>
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Requested only after the user chooses local photos on a TV without a document picker. -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
     <uses-permission android:name="com.android.providers.tv.permission.READ_EPG_DATA" />
     <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />

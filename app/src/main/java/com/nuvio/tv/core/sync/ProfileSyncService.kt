@@ -124,7 +124,9 @@ class ProfileSyncService @Inject constructor(
                         avatarId = entry.avatarId,
                         avatarUrl = entry.avatarUrl,
                         profileBackgroundId = entry.profileBackgroundId,
-                        profileBackgroundUrl = entry.profileBackgroundUrl
+                        profileBackgroundUrl = entry.profileBackgroundUrl,
+                        studioOwnerId = userId,
+                        studioRemoteId = entry.id?.takeIf { it.isNotBlank() }
                     )
                 }
 

@@ -1,0 +1,654 @@
+{
+  "schemaVersion": 1,
+  "provider": "OpenMoji",
+  "tag": "17.0.0",
+  "sourceCommit": "f9fc506a3f913be9897ab0181d611d4c910a4104",
+  "sourceUrl": "https://github.com/hfg-gmuend/openmoji/tree/f9fc506a3f913be9897ab0181d611d4c910a4104",
+  "graphicsLicense": "CC-BY-SA-4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+  "attribution": "OpenMoji, Benedikt Groß, Daniel Utz and contributors (HfG Schwäbisch Gmünd)",
+  "modifiedArtwork": false,
+  "archiveSha256": "59b0cd9f6fe033818fc02585cea42bea9fba5d68a4d3a3639bfe5d5cc3805689",
+  "items": [
+    {
+      "id": "openmoji-1f98a",
+      "code": "1F98A",
+      "category": "animals",
+      "namePtBr": "Raposa",
+      "nameEn": "fox",
+      "file": "1F98A.svg",
+      "bytes": 4534,
+      "sha256": "b7fe9b1dce87c5e931d7e58ab77bcde8cc6ee7804e41005f199c3097960e225b"
+    },
+    {
+      "id": "openmoji-1f431",
+      "code": "1F431",
+      "category": "animals",
+      "namePtBr": "Gato",
+      "nameEn": "cat face",
+      "file": "1F431.svg",
+      "bytes": 3031,
+      "sha256": "c0524dc19297fb8cdc521f8f09e2ea777717bb4a85fead116aeab5fd957e9fdc"
+    },
+    {
+      "id": "openmoji-1f436",
+      "code": "1F436",
+      "category": "animals",
+      "namePtBr": "Cachorro",
+      "nameEn": "dog face",
+      "file": "1F436.svg",
+      "bytes": 3328,
+      "sha256": "e29dcecb29e73d442fadbb588a0b2a0d4225452070d3d5154d1ddeaf92434713"
+    },
+    {
+      "id": "openmoji-1f981",
+      "code": "1F981",
+      "category": "animals",
+      "namePtBr": "Leão",
+      "nameEn": "lion",
+      "file": "1F981.svg",
+      "bytes": 6435,
+      "sha256": "89f48f2663553b37db9db4f9bac6cef32780ca409a81641fc2867fd6939384d8"
+    },
+    {
+      "id": "openmoji-1f42f",
+      "code": "1F42F",
+      "category": "animals",
+      "namePtBr": "Tigre",
+      "nameEn": "tiger face",
+      "file": "1F42F.svg",
+      "bytes": 5228,
+      "sha256": "a72f5cf9e3abb6aede0058ec81132cf3e6fd0f7119a5f43b01bce4607ade8f29"
+    },
+    {
+      "id": "openmoji-1f43c",
+      "code": "1F43C",
+      "category": "animals",
+      "namePtBr": "Panda",
+      "nameEn": "panda",
+      "file": "1F43C.svg",
+      "bytes": 3892,
+      "sha256": "1a7d798321529d986f47038a1e0a97501af96f9b956724be567f4f874e5c08f4"
+    },
+    {
+      "id": "openmoji-1f428",
+      "code": "1F428",
+      "category": "animals",
+      "namePtBr": "Coala",
+      "nameEn": "koala",
+      "file": "1F428.svg",
+      "bytes": 3480,
+      "sha256": "5dc549f4e9776fd52952c119055dcac5c131a006e9424d7ff7db460fe69277ef"
+    },
+    {
+      "id": "openmoji-1f43b",
+      "code": "1F43B",
+      "category": "animals",
+      "namePtBr": "Urso",
+      "nameEn": "bear",
+      "file": "1F43B.svg",
+      "bytes": 3177,
+      "sha256": "ecf7e2ef9bfecea82f1f32198c0ff30999ca62bf269652cc976d57b9c6aa3a79"
+    },
+    {
+      "id": "openmoji-1f430",
+      "code": "1F430",
+      "category": "animals",
+      "namePtBr": "Coelho",
+      "nameEn": "rabbit face",
+      "file": "1F430.svg",
+      "bytes": 2875,
+      "sha256": "a34d950eed63b6212cbdd2d5de4e0933644562fe614a1f4af254607cd3b3a0f6"
+    },
+    {
+      "id": "openmoji-1f438",
+      "code": "1F438",
+      "category": "animals",
+      "namePtBr": "Sapo",
+      "nameEn": "frog",
+      "file": "1F438.svg",
+      "bytes": 1985,
+      "sha256": "9cca6f554d546844956436783f43cdd959ace53db44d9335101c8e5cf13d03df"
+    },
+    {
+      "id": "openmoji-1f989",
+      "code": "1F989",
+      "category": "animals",
+      "namePtBr": "Coruja",
+      "nameEn": "owl",
+      "file": "1F989.svg",
+      "bytes": 2505,
+      "sha256": "9237423e6c8d37e6ba2a02b779183d6a8ebdd212bc8cd4e5c8bc0a7de989ab51"
+    },
+    {
+      "id": "openmoji-1f427",
+      "code": "1F427",
+      "category": "animals",
+      "namePtBr": "Pinguim",
+      "nameEn": "penguin",
+      "file": "1F427.svg",
+      "bytes": 2941,
+      "sha256": "6cac4561b51d9695a9ebc010d2f2923dc78e4fc106ecb043f25069120e6bdd74"
+    },
+    {
+      "id": "openmoji-1f99c",
+      "code": "1F99C",
+      "category": "animals",
+      "namePtBr": "Papagaio",
+      "nameEn": "parrot",
+      "file": "1F99C.svg",
+      "bytes": 4250,
+      "sha256": "09f73898075506b6dde9141e9bd034879c7388b37e76a657c7ec5b98ae02f4cb"
+    },
+    {
+      "id": "openmoji-1f98b",
+      "code": "1F98B",
+      "category": "animals",
+      "namePtBr": "Borboleta",
+      "nameEn": "butterfly",
+      "file": "1F98B.svg",
+      "bytes": 4303,
+      "sha256": "47b4971766ec7d4d913142eac844bb33c526b72839209c8acb531483a2f4072d"
+    },
+    {
+      "id": "openmoji-1f422",
+      "code": "1F422",
+      "category": "animals",
+      "namePtBr": "Tartaruga",
+      "nameEn": "turtle",
+      "file": "1F422.svg",
+      "bytes": 5910,
+      "sha256": "c3054c9394a9710c47d7057eebd48b31fe7292a555eacadb6eb47ed5a8b5d829"
+    },
+    {
+      "id": "openmoji-1f419",
+      "code": "1F419",
+      "category": "animals",
+      "namePtBr": "Polvo",
+      "nameEn": "octopus",
+      "file": "1F419.svg",
+      "bytes": 2426,
+      "sha256": "e193d8d3890788d14d99b9c77dc409b091e99258d7d45bf1ad00359671858c93"
+    },
+    {
+      "id": "openmoji-1f433",
+      "code": "1F433",
+      "category": "animals",
+      "namePtBr": "Baleia",
+      "nameEn": "spouting whale",
+      "file": "1F433.svg",
+      "bytes": 7397,
+      "sha256": "c648a7085ea84a3df8fd254ff2eaa938b6daafa951d2d580ae1908f0a5a52cc7"
+    },
+    {
+      "id": "openmoji-1f980",
+      "code": "1F980",
+      "category": "animals",
+      "namePtBr": "Caranguejo",
+      "nameEn": "crab",
+      "file": "1F980.svg",
+      "bytes": 4463,
+      "sha256": "be92f07c4f875dae9e8bd7e18bf5276af7901126f1c2077dd1c70660484e56f2"
+    },
+    {
+      "id": "openmoji-1f41d",
+      "code": "1F41D",
+      "category": "animals",
+      "namePtBr": "Abelha",
+      "nameEn": "honeybee",
+      "file": "1F41D.svg",
+      "bytes": 5190,
+      "sha256": "d37d39f309a3c79b01227a0b81fb8073679842f546fdd745a506b8d9cae026a4"
+    },
+    {
+      "id": "openmoji-1f40c",
+      "code": "1F40C",
+      "category": "animals",
+      "namePtBr": "Caracol",
+      "nameEn": "snail",
+      "file": "1F40C.svg",
+      "bytes": 1463,
+      "sha256": "cf0a2dce1a9bad6d9a9c11d58296daf8da76bf5d8389b6d26202151422186e20"
+    },
+    {
+      "id": "openmoji-1f43a",
+      "code": "1F43A",
+      "category": "animals",
+      "namePtBr": "Lobo",
+      "nameEn": "wolf",
+      "file": "1F43A.svg",
+      "bytes": 5336,
+      "sha256": "aad8735dbdb1b726c0fd6a04123d883d1bc705f0e7fb635b4c26642cf2cd9793"
+    },
+    {
+      "id": "openmoji-1f984",
+      "code": "1F984",
+      "category": "fantasy",
+      "namePtBr": "Unicórnio",
+      "nameEn": "unicorn",
+      "file": "1F984.svg",
+      "bytes": 3258,
+      "sha256": "a0a942925c9a508041986dbebdaf65cf8e44fe7f9ee195afef6df48ba732f4b1"
+    },
+    {
+      "id": "openmoji-1f409",
+      "code": "1F409",
+      "category": "fantasy",
+      "namePtBr": "Dragão",
+      "nameEn": "dragon",
+      "file": "1F409.svg",
+      "bytes": 3843,
+      "sha256": "8ab58824843e8d2fb7e43675223133f12904847c59e8956708940c182bafe4f0"
+    },
+    {
+      "id": "openmoji-1f47d",
+      "code": "1F47D",
+      "category": "space",
+      "namePtBr": "Alienígena",
+      "nameEn": "alien",
+      "file": "1F47D.svg",
+      "bytes": 2272,
+      "sha256": "efe91154823a36a7ad1e20be3fbcc6829a8963647078d42c6efb64696e0b495a"
+    },
+    {
+      "id": "openmoji-1f47e",
+      "code": "1F47E",
+      "category": "space",
+      "namePtBr": "Criatura espacial",
+      "nameEn": "alien monster",
+      "file": "1F47E.svg",
+      "bytes": 3835,
+      "sha256": "e060345a02973d816ba6ab9d6102356ac2ede45d6f09e8699c709504cc5e112e"
+    },
+    {
+      "id": "openmoji-1f916",
+      "code": "1F916",
+      "category": "space",
+      "namePtBr": "Robô",
+      "nameEn": "robot",
+      "file": "1F916.svg",
+      "bytes": 3632,
+      "sha256": "18b41695fe7a69a9f19908d1906101e761ac9391c8e9e8f4943a630f310a8781"
+    },
+    {
+      "id": "openmoji-1f680",
+      "code": "1F680",
+      "category": "space",
+      "namePtBr": "Foguete",
+      "nameEn": "rocket",
+      "file": "1F680.svg",
+      "bytes": 4498,
+      "sha256": "2403e0a305f931cf8c2ebd1a06de994c08733d0554eda8c0e52d1b8fe1be7001"
+    },
+    {
+      "id": "openmoji-1f6f8",
+      "code": "1F6F8",
+      "category": "space",
+      "namePtBr": "Disco voador",
+      "nameEn": "flying saucer",
+      "file": "1F6F8.svg",
+      "bytes": 11198,
+      "sha256": "5fd4ba50a986f279a9ee21686b2942ff616729b8c37e333bd6495d8c1720546f"
+    },
+    {
+      "id": "openmoji-1f319",
+      "code": "1F319",
+      "category": "space",
+      "namePtBr": "Lua crescente",
+      "nameEn": "crescent moon",
+      "file": "1F319.svg",
+      "bytes": 1178,
+      "sha256": "54cde751c97683286b15a7402f722e4c9fe5487e56b78738bd3e85da2534bd84"
+    },
+    {
+      "id": "openmoji-1f31d",
+      "code": "1F31D",
+      "category": "space",
+      "namePtBr": "Lua cheia",
+      "nameEn": "full moon face",
+      "file": "1F31D.svg",
+      "bytes": 2019,
+      "sha256": "3260af69036a0c344b481785cc99ac87ec31b24c15ccea09bd1ed8689d9b1335"
+    },
+    {
+      "id": "openmoji-1f30c",
+      "code": "1F30C",
+      "category": "space",
+      "namePtBr": "Via Láctea",
+      "nameEn": "milky way",
+      "file": "1F30C.svg",
+      "bytes": 6294,
+      "sha256": "41de2d1b2c4ccba7fa12b6e892219c6414371ea92da458cebab94760e5161f9c"
+    },
+    {
+      "id": "openmoji-1f6f0",
+      "code": "1F6F0",
+      "category": "space",
+      "namePtBr": "Satélite",
+      "nameEn": "satellite",
+      "file": "1F6F0.svg",
+      "bytes": 5521,
+      "sha256": "bd9b78fd1993976d91b2b198931fbe41718c805223646dff5aa7b7c2514eaca7"
+    },
+    {
+      "id": "openmoji-1fa90",
+      "code": "1FA90",
+      "category": "space",
+      "namePtBr": "Planeta com anéis",
+      "nameEn": "ringed planet",
+      "file": "1FA90.svg",
+      "bytes": 1559,
+      "sha256": "03583dd50fbaa34fd6adbf63261037c6f82511864024da5ed572d3b24d694643"
+    },
+    {
+      "id": "openmoji-2604",
+      "code": "2604",
+      "category": "space",
+      "namePtBr": "Cometa",
+      "nameEn": "comet",
+      "file": "2604.svg",
+      "bytes": 2821,
+      "sha256": "1f5f727a8fe8bc0cec2bfcce1e6a6e5536070e4a09d89b13af5b50be63a82073"
+    },
+    {
+      "id": "openmoji-1f9da",
+      "code": "1F9DA",
+      "category": "fantasy",
+      "namePtBr": "Fada",
+      "nameEn": "fairy",
+      "file": "1F9DA.svg",
+      "bytes": 4746,
+      "sha256": "ce43c50f9b05bb7458d6bd45728e5d33e20311fc9ea9cae1e29706ff9e9c34e4"
+    },
+    {
+      "id": "openmoji-1f9dd",
+      "code": "1F9DD",
+      "category": "fantasy",
+      "namePtBr": "Elfo",
+      "nameEn": "elf",
+      "file": "1F9DD.svg",
+      "bytes": 5172,
+      "sha256": "77a327c693e91676bd859b06c7c513984dc7b6dc0d79ee8f8c3f35ca76442621"
+    },
+    {
+      "id": "openmoji-1f9d9",
+      "code": "1F9D9",
+      "category": "fantasy",
+      "namePtBr": "Mago",
+      "nameEn": "mage",
+      "file": "1F9D9.svg",
+      "bytes": 3063,
+      "sha256": "caf1ef1b2580378ab898c9f121ac1f1b878c713dd324236e02a7427e74008cab"
+    },
+    {
+      "id": "openmoji-1f9db",
+      "code": "1F9DB",
+      "category": "fantasy",
+      "namePtBr": "Vampiro",
+      "nameEn": "vampire",
+      "file": "1F9DB.svg",
+      "bytes": 2585,
+      "sha256": "f4af323369a3abd3428badbe88bbdb932b07c83d570dcd5f53197b446b4c2063"
+    },
+    {
+      "id": "openmoji-1f9de",
+      "code": "1F9DE",
+      "category": "fantasy",
+      "namePtBr": "Gênio",
+      "nameEn": "genie",
+      "file": "1F9DE.svg",
+      "bytes": 3524,
+      "sha256": "b58280738f5a226a7522b82e2714aadc9b9b4bacae96b4edd7ce7c2e6793f76e"
+    },
+    {
+      "id": "openmoji-1f9df",
+      "code": "1F9DF",
+      "category": "fantasy",
+      "namePtBr": "Zumbi",
+      "nameEn": "zombie",
+      "file": "1F9DF.svg",
+      "bytes": 3948,
+      "sha256": "7dd9fa60bb779cfa0fcd4fb4c7e12ff5ed10d670d54db718d31b08ba0322f87a"
+    },
+    {
+      "id": "openmoji-1f9dc",
+      "code": "1F9DC",
+      "category": "fantasy",
+      "namePtBr": "Sereia",
+      "nameEn": "merperson",
+      "file": "1F9DC.svg",
+      "bytes": 5063,
+      "sha256": "d1e8368b093c2616522bd99fdda2d82f50af54a96ffde75855c5ef82c49c9df7"
+    },
+    {
+      "id": "openmoji-1f52e",
+      "code": "1F52E",
+      "category": "fantasy",
+      "namePtBr": "Bola de cristal",
+      "nameEn": "crystal ball",
+      "file": "1F52E.svg",
+      "bytes": 2110,
+      "sha256": "8005442f91f988c9d073a5d964fe0c74e3002a9324d8e901e67b74665464e441"
+    },
+    {
+      "id": "openmoji-1fa84",
+      "code": "1FA84",
+      "category": "fantasy",
+      "namePtBr": "Varinha mágica",
+      "nameEn": "magic wand",
+      "file": "1FA84.svg",
+      "bytes": 2259,
+      "sha256": "7afb782d8b7a8bf5356f30ef00852f52af68b9ccc02c2382fe9c14bf4afae0e5"
+    },
+    {
+      "id": "openmoji-1f3f0",
+      "code": "1F3F0",
+      "category": "fantasy",
+      "namePtBr": "Castelo",
+      "nameEn": "castle",
+      "file": "1F3F0.svg",
+      "bytes": 4597,
+      "sha256": "e68e8876ae74d15c08f39fe51c93311287ddfbaaf98708f4818106bac4aff287"
+    },
+    {
+      "id": "openmoji-1f338",
+      "code": "1F338",
+      "category": "nature",
+      "namePtBr": "Flor de cerejeira",
+      "nameEn": "cherry blossom",
+      "file": "1F338.svg",
+      "bytes": 3565,
+      "sha256": "f8cee8b0a231fc395288cd2c33e41ede7150be2a72f0e3d1c0308b08405b3a4f"
+    },
+    {
+      "id": "openmoji-1f33b",
+      "code": "1F33B",
+      "category": "nature",
+      "namePtBr": "Girassol",
+      "nameEn": "sunflower",
+      "file": "1F33B.svg",
+      "bytes": 4348,
+      "sha256": "8ec898c7225016a95cc1c71c1634ac2e1966f5c97b7d9ee209ebe35a003fa08b"
+    },
+    {
+      "id": "openmoji-1f339",
+      "code": "1F339",
+      "category": "nature",
+      "namePtBr": "Rosa",
+      "nameEn": "rose",
+      "file": "1F339.svg",
+      "bytes": 5172,
+      "sha256": "4c6a3039e5d8256e3c8cadbfd77d339bac349a79fc75b0b91ba20846b750b113"
+    },
+    {
+      "id": "openmoji-1f337",
+      "code": "1F337",
+      "category": "nature",
+      "namePtBr": "Tulipa",
+      "nameEn": "tulip",
+      "file": "1F337.svg",
+      "bytes": 2860,
+      "sha256": "fdd5d3e1a21a60d1b7ffdbb9d39d3629d098d1cdd61f7f405a7e3a1902b1dc13"
+    },
+    {
+      "id": "openmoji-1f33a",
+      "code": "1F33A",
+      "category": "nature",
+      "namePtBr": "Hibisco",
+      "nameEn": "hibiscus",
+      "file": "1F33A.svg",
+      "bytes": 3356,
+      "sha256": "6d297061a2a9cc5da0993769e76235936e50c67a3864f6fcf1e2ef93625231f2"
+    },
+    {
+      "id": "openmoji-1f335",
+      "code": "1F335",
+      "category": "nature",
+      "namePtBr": "Cacto",
+      "nameEn": "cactus",
+      "file": "1F335.svg",
+      "bytes": 2867,
+      "sha256": "b19504e42ee3f15cb25883fcbfab726fce1ce4e30003a2def776e7e3a693055f"
+    },
+    {
+      "id": "openmoji-1f334",
+      "code": "1F334",
+      "category": "nature",
+      "namePtBr": "Palmeira",
+      "nameEn": "palm tree",
+      "file": "1F334.svg",
+      "bytes": 2817,
+      "sha256": "89c0ce89ff4eca910c9b8585cb8043b44d59938efa1e8a51c95161aef111753f"
+    },
+    {
+      "id": "openmoji-1f332",
+      "code": "1F332",
+      "category": "nature",
+      "namePtBr": "Pinheiro",
+      "nameEn": "evergreen tree",
+      "file": "1F332.svg",
+      "bytes": 1558,
+      "sha256": "0d03d0ea7819bf9fd22614a0623b7594d4175a986a18b386adfc6490844c48eb"
+    },
+    {
+      "id": "openmoji-1f333",
+      "code": "1F333",
+      "category": "nature",
+      "namePtBr": "Árvore",
+      "nameEn": "deciduous tree",
+      "file": "1F333.svg",
+      "bytes": 1744,
+      "sha256": "5e9aa542a9e8bce244c326fd2d1427f432ad72e5d8ba92905f3d801d393f6b63"
+    },
+    {
+      "id": "openmoji-1f344",
+      "code": "1F344",
+      "category": "nature",
+      "namePtBr": "Cogumelo",
+      "nameEn": "mushroom",
+      "file": "1F344.svg",
+      "bytes": 3432,
+      "sha256": "7657d0268cc58d88308bdcc0d890133b11be6aa51720f1baef51ac88af116d6d"
+    },
+    {
+      "id": "openmoji-1f340",
+      "code": "1F340",
+      "category": "nature",
+      "namePtBr": "Trevo",
+      "nameEn": "four leaf clover",
+      "file": "1F340.svg",
+      "bytes": 2929,
+      "sha256": "3c9c9999ac96f74d74613b8bf3e37d3e2ec8c18438cf4c5caf1e5bc4d146fd8b"
+    },
+    {
+      "id": "openmoji-1f341",
+      "code": "1F341",
+      "category": "nature",
+      "namePtBr": "Folha de bordo",
+      "nameEn": "maple leaf",
+      "file": "1F341.svg",
+      "bytes": 1736,
+      "sha256": "cf841d0c04c87362e82e017d21afa402a37dac62855c7d2867252e1f34221770"
+    },
+    {
+      "id": "openmoji-1f342",
+      "code": "1F342",
+      "category": "nature",
+      "namePtBr": "Folha caída",
+      "nameEn": "fallen leaf",
+      "file": "1F342.svg",
+      "bytes": 958,
+      "sha256": "522cd259e0fe0fd683ac76aa053f85a16a1d64f253d9de2e72c5cf3afb5eac12"
+    },
+    {
+      "id": "openmoji-1f343",
+      "code": "1F343",
+      "category": "nature",
+      "namePtBr": "Folha ao vento",
+      "nameEn": "leaf fluttering in wind",
+      "file": "1F343.svg",
+      "bytes": 1455,
+      "sha256": "64911728d7fcb10e205db760f0f82c1ceae3153878d369dc10cf8ec2c50f03bb"
+    },
+    {
+      "id": "openmoji-2744",
+      "code": "2744",
+      "category": "nature",
+      "namePtBr": "Floco de neve",
+      "nameEn": "snowflake",
+      "file": "2744.svg",
+      "bytes": 2843,
+      "sha256": "f057214052c38695363c9a7b84c1de08e483576f9573aebcd5e0bff918e6b922"
+    },
+    {
+      "id": "openmoji-1f525",
+      "code": "1F525",
+      "category": "nature",
+      "namePtBr": "Fogo",
+      "nameEn": "fire",
+      "file": "1F525.svg",
+      "bytes": 3130,
+      "sha256": "c9d2cc9cedfa557ff34c859b8af6556436913ec0c73a65a6533676698c3edcf0"
+    },
+    {
+      "id": "openmoji-1f4a7",
+      "code": "1F4A7",
+      "category": "nature",
+      "namePtBr": "Gota",
+      "nameEn": "droplet",
+      "file": "1F4A7.svg",
+      "bytes": 916,
+      "sha256": "ec3895fbd78797679bad1be852d05e659977a010764a7b049822ef7c687ae18c"
+    },
+    {
+      "id": "openmoji-1f308",
+      "code": "1F308",
+      "category": "nature",
+      "namePtBr": "Arco-íris",
+      "nameEn": "rainbow",
+      "file": "1F308.svg",
+      "bytes": 2204,
+      "sha256": "11da8e88fe999791d246187ce49b50ac8b1763ce7dc7b471b7f04ef3634baf81"
+    },
+    {
+      "id": "openmoji-1f30a",
+      "code": "1F30A",
+      "category": "nature",
+      "namePtBr": "Onda",
+      "nameEn": "water wave",
+      "file": "1F30A.svg",
+      "bytes": 2480,
+      "sha256": "ce86414cffcc35efc54fe5427a3d57c3f00acfde9d35b33d664fda483ae1c63b"
+    },
+    {
+      "id": "openmoji-1f31e",
+      "code": "1F31E",
+      "category": "nature",
+      "namePtBr": "Sol",
+      "nameEn": "sun with face",
+      "file": "1F31E.svg",
+      "bytes": 2415,
+      "sha256": "7cdb40a65af3822b60218925392ca807b9a4951263db74b68814121f528301e8"
+    }
+  ]
+}

@@ -6,6 +6,15 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AvatarImagePolicyTest {
+    @Test fun largeInputsAreSampledWithinTheWorkingPixelBudget() {
+        assertEquals(1, AvatarImagePolicy.sampleSize(200,100))
+        assertEquals(2, AvatarImagePolicy.sampleSize(3000,2000))
+        assertEquals(2, AvatarImagePolicy.sampleSize(4096,4096))
+        for ((w,h) in listOf(8192 to 2048, 3001 to 2001, 4096 to 4096)) {
+            val sample = AvatarImagePolicy.sampleSize(w,h)
+            assertTrue(((w.toLong()+sample-1)/sample)*((h.toLong()+sample-1)/sample) <= AvatarImagePolicy.MAX_WORKING_PIXELS)
+        }
+    }
     @Test fun invalidDimensionsAndDecodedPixelBombsAreRefused() {
         for ((width, height) in listOf(0 to 100, 100 to -1, 8193 to 1, 8192 to 8192, Int.MAX_VALUE to Int.MAX_VALUE)) {
             try { AvatarImagePolicy.checkDimensions(width, height); fail("Invalid raster accepted") }

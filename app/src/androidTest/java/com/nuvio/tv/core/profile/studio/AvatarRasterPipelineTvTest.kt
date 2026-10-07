@@ -13,6 +13,20 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class AvatarRasterPipelineTvTest {
+    @Test fun largeRasterIsDecodedAtABoundedWorkingResolutionBeforeCrop() {
+        val original = Bitmap.createBitmap(3000,2000,Bitmap.Config.ARGB_8888)
+        val bytes = try {
+            original.eraseColor(Color.BLUE)
+            ByteArrayOutputStream().use { assertTrue(original.compress(Bitmap.CompressFormat.PNG,100,it)); it.toByteArray() }
+        } finally { original.recycle() }
+        AvatarRasterPipeline.decode(bytes).use { source ->
+            assertEquals(1500, source.width); assertEquals(1000, source.height)
+            assertTrue(source.width.toLong()*source.height <= AvatarImagePolicy.MAX_WORKING_PIXELS)
+            val png = AvatarRasterPipeline.preview(source,AvatarCrop())
+            val preview = BitmapFactory.decodeByteArray(png,0,png.size)
+            try { assertEquals(Color.BLUE,preview.getPixel(128,128)) } finally { preview.recycle() }
+        }
+    }
     private fun encoded(format: Bitmap.CompressFormat = Bitmap.CompressFormat.PNG): ByteArray {
         val bitmap = Bitmap.createBitmap(200,100,Bitmap.Config.ARGB_8888)
         try {

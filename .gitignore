@@ -57,6 +57,10 @@ HOME_UI_OPTIMIZATION_NOTES.local.md
 .kotlin/
 bugs/
 avatars/
+!app/src/main/assets/profile-studio/avatars/
+!app/src/main/assets/profile-studio/avatars/*.svg
+!app/src/main/assets/profile-studio/avatars/catalog.json
+!app/src/main/assets/profile-studio/avatars/LICENSE.txt
 local-assets/supporter-profile-backgrounds/
 logs
 AGENTS.md

@@ -509,7 +509,8 @@ open class MainActivity : ComponentActivity() {
                     .getOrDefault(emptyList())
             }
 
-            val activeProfileAvatarImageUrl = remember(activeProfile, avatarCatalog) {
+            val studioProfileAvatar = com.nuvio.tv.ui.screens.profile.rememberStudioAvatarImage(activeProfile)
+            val activeProfileAvatarImageUrl = studioProfileAvatar ?: remember(activeProfile, avatarCatalog) {
                 activeProfile?.avatarUrl?.takeIf { it.isNotBlank() }
                     ?: activeProfile?.avatarId?.let { avatarRepository.getAvatarImageUrl(it, avatarCatalog) }
             }

@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
+import java.util.UUID
 
 private val Context.profileDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "profile_settings",
@@ -31,7 +32,8 @@ private val Context.profileDataStore: DataStore<Preferences> by preferencesDataS
 @Singleton
 class ProfileDataStore @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val moshi: Moshi
+    private val moshi: Moshi,
+    private val studioAvatars: com.nuvio.tv.core.profile.studio.ProfileStudioAvatarRepository
 ) {
     private val dataStore = context.profileDataStore
 
@@ -103,9 +105,9 @@ class ProfileDataStore @Inject constructor(
             val current = parseProfiles(prefs[profilesJsonKey]).toMutableList()
             val index = current.indexOfFirst { it.id == profile.id }
             if (index >= 0) {
-                current[index] = profile
+                current[index] = profile.withStudioIdentity(current[index])
             } else {
-                current.add(profile)
+                current.add(profile.withStudioIdentity())
             }
             prefs[profilesJsonKey] = serializeProfiles(current)
         }
@@ -125,7 +127,9 @@ class ProfileDataStore @Inject constructor(
 
     suspend fun replaceAllProfiles(profiles: List<UserProfile>) {
         dataStore.edit { prefs ->
-            val normalizedProfiles = normalizeProfiles(profiles)
+            val previous = parseProfiles(prefs[profilesJsonKey]).associateBy { it.id }
+            val normalizedProfiles = normalizeProfiles(profiles).map { it.withStudioIdentity(previous[it.id]) }
+            normalizedProfiles.forEach { profile -> studioAvatars.adoptRemoteIdentity(previous[profile.id],profile) }
             prefs[profilesJsonKey] = serializeProfiles(normalizedProfiles)
             val activeId = prefs[activeProfileIdKey] ?: 1
             if (normalizedProfiles.none { it.id == activeId }) {
@@ -143,7 +147,8 @@ class ProfileDataStore @Inject constructor(
     private fun defaultPrimaryProfile() = UserProfile(
         id = 1,
         name = context.getString(R.string.profile_default_name, 1),
-        avatarColorHex = "#1E88E5"
+        avatarColorHex = "#1E88E5",
+        studioIdentity = "local-primary"
     )
 
     private fun parseProfiles(json: String?): List<UserProfile> {
@@ -179,7 +184,10 @@ internal data class ProfileJson(
     val avatarId: String? = null,
     val avatarUrl: String? = null,
     val profileBackgroundId: String? = null,
-    val profileBackgroundUrl: String? = null
+    val profileBackgroundUrl: String? = null,
+    val studioIdentity: String = "",
+    val studioOwnerId: String? = null,
+    val studioRemoteId: String? = null
 ) {
     fun toDomain() = UserProfile(
         id = id,
@@ -190,7 +198,10 @@ internal data class ProfileJson(
         avatarId = avatarId,
         avatarUrl = avatarUrl,
         profileBackgroundId = profileBackgroundId,
-        profileBackgroundUrl = profileBackgroundUrl
+        profileBackgroundUrl = profileBackgroundUrl,
+        studioIdentity = studioIdentity.ifBlank { "legacy-local-$id" },
+        studioOwnerId = studioOwnerId,
+        studioRemoteId = studioRemoteId
     )
 
     companion object {
@@ -203,7 +214,19 @@ internal data class ProfileJson(
             avatarId = profile.avatarId,
             avatarUrl = profile.avatarUrl,
             profileBackgroundId = profile.profileBackgroundId,
-            profileBackgroundUrl = profile.profileBackgroundUrl
+            profileBackgroundUrl = profile.profileBackgroundUrl,
+            studioIdentity = profile.studioIdentity,
+            studioOwnerId = profile.studioOwnerId,
+            studioRemoteId = profile.studioRemoteId
         )
     }
 }
+
+internal fun UserProfile.withStudioIdentity(previous: UserProfile? = null): UserProfile = copy(
+    studioIdentity = studioRemoteId?.takeIf { it.isNotBlank() }?.let { "remote-$it" } ?: studioIdentity.ifBlank {
+        previous?.takeIf {
+            it.studioOwnerId == studioOwnerId && (it.studioRemoteId == null || studioRemoteId == null || it.studioRemoteId == studioRemoteId)
+        }?.studioIdentity?.takeIf { it.isNotBlank() }
+            ?: "local-${UUID.randomUUID()}"
+    }
+)

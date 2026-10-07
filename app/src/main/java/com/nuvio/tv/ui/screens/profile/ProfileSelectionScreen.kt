@@ -61,6 +61,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -586,8 +589,10 @@ fun ProfileSelectionScreen(
                 avatarUrlResolver = { avatarId -> viewModel.getAvatarImageUrl(avatarId) },
                 onDismiss = { profileToEdit = null },
                 onSaveProfile = { updated ->
-                    viewModel.updateProfile(updated)
-                    profileToEdit = null
+                    viewModel.updateProfile(updated) { success ->
+                        if (success) profileToEdit = null
+                        else profileActionMessage = context.getString(R.string.studio_profile_save_error)
+                    }
                 }
             )
         }
@@ -1027,7 +1032,7 @@ private fun ProfileGrid(
                 profiles.forEachIndexed { index, profile ->
                     ProfileCard(
                         profile = profile,
-                        avatarImageUrl = profile.avatarUrl?.takeIf { it.isNotBlank() }
+                        avatarImageUrl = rememberStudioAvatarImage(profile) ?: profile.avatarUrl?.takeIf { it.isNotBlank() }
                             ?: profile.avatarId?.let(avatarImageUrlsById::get),
                         focusRequester = focusRequesters[index],
                         compact = useCompactCards,
@@ -1723,7 +1728,7 @@ private fun rememberKeyboardVisibilityState(): KeyboardVisibilityState {
 }
 
 @Composable
-private fun EditProfileOverlay(
+internal fun EditProfileOverlay(
     profile: UserProfile,
     avatarCatalog: List<AvatarCatalogItem>,
     profileBackgroundCatalog: List<ProfileBackgroundCatalogItem>,
@@ -1733,7 +1738,8 @@ private fun EditProfileOverlay(
     onDismiss: () -> Unit,
     onSaveProfile: (UserProfile) -> Unit
 ) {
-    BackHandler(onBack = onDismiss)
+    var studioBusy by remember { mutableStateOf(false) }
+    BackHandler { if (!studioBusy && !isSaving) onDismiss() }
 
     var profileName by remember { mutableStateOf(profile.name) }
     var selectedColorHex by remember { mutableStateOf(profile.avatarColorHex) }
@@ -1746,30 +1752,32 @@ private fun EditProfileOverlay(
     var selectedBackgroundUrl by remember(profile.id, profile.profileBackgroundUrl) {
         mutableStateOf(profile.profileBackgroundUrl?.takeIf { it.isNotBlank() })
     }
-    var selectedEditorTab by remember(profile.id) { mutableStateOf(ProfileEditorTab.Avatar) }
+    var selectedEditorTab by remember(profile.id) { mutableStateOf(ProfileEditorTab.Studio) }
     var focusedAvatarName by remember { mutableStateOf<String?>(null) }
     val selectedAvatar = remember(avatarCatalog, selectedAvatarId) {
         avatarCatalog.find { it.id == selectedAvatarId }
     }
     val hasChangedAvatarSelection = selectedAvatarId != profile.avatarId
-    val previewAvatarImageUrl = when {
+    val studioAvatarImage = rememberStudioAvatarImage(profile)
+    val previewAvatarImageUrl = studioAvatarImage ?: when {
         selectedAvatar != null -> selectedAvatar.imageUrl
         !hasChangedAvatarSelection -> profile.avatarUrl?.takeIf { it.isNotBlank() }
             ?: avatarUrlResolver(profile.avatarId)
         else -> null
     }
     val nameFocusRequester = remember { FocusRequester() }
+    val saveFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
         repeat(2) { withFrameNanos { } }
-        runCatching { nameFocusRequester.requestFocus() }
+        runCatching { saveFocusRequester.requestFocus() }
     }
 
     LaunchedEffect(hasProfileBackgroundAccess) {
-        if (!hasProfileBackgroundAccess) selectedEditorTab = ProfileEditorTab.Avatar
+        if (!hasProfileBackgroundAccess && selectedEditorTab == ProfileEditorTab.Background) selectedEditorTab = ProfileEditorTab.Studio
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.85f))
@@ -1778,7 +1786,7 @@ private fun EditProfileOverlay(
                 if (native.action == AndroidKeyEvent.ACTION_UP &&
                     native.keyCode == AndroidKeyEvent.KEYCODE_BACK
                 ) {
-                    onDismiss()
+                    if (!studioBusy && !isSaving) onDismiss()
                     true
                 } else {
                     false
@@ -1787,34 +1795,38 @@ private fun EditProfileOverlay(
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-                onClick = onDismiss
+                onClick = { if (!studioBusy && !isSaving) onDismiss() }
             ),
         contentAlignment = Alignment.Center
     ) {
+        val compactEditor = maxHeight < 440.dp
+        val panelHeight = (maxHeight - 24.dp).coerceAtLeast(120.dp)
         Column(
             modifier = Modifier
-                .fillMaxWidth(0.92f)
                 .widthIn(max = ProfileSelectionSpacing.EditorPanelMaxWidth)
+                .fillMaxWidth(0.92f)
+                .heightIn(max = panelHeight)
                 .clip(RoundedCornerShape(20.dp))
-                .background(NuvioTheme.colors.BackgroundElevated)
-                .border(NuvioTheme.spacing.hairline, NuvioTheme.colors.Border, RoundedCornerShape(20.dp))
+                .background(Color(0xFF0D1522))
+                .border(1.dp, Color(0xFFE6BD75).copy(alpha = 0.25f), RoundedCornerShape(20.dp))
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
                     onClick = {}
                 )
-                .padding(NuvioTheme.spacing.xxl),
+                .padding(if (compactEditor) 12.dp else NuvioTheme.spacing.xxl)
+                .testTag("studio-profile-dialog"),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Header row: title left, save button right
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = NuvioTheme.spacing.xl),
+                    .padding(start = if (compactEditor) 0.dp else NuvioTheme.spacing.xl),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.xxs)) {
+                Column(modifier = Modifier.weight(1f).padding(end = 12.dp), verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.xxs)) {
                     Text(
                         text = stringResource(R.string.profile_edit_header),
                         color = NuvioTheme.colors.TextSecondary,
@@ -1827,15 +1839,18 @@ private fun EditProfileOverlay(
                             textDirection = profile.name.contentTextDirection()
                         ),
                         color = Color.White,
-                        fontSize = 30.sp,
-                        fontWeight = FontWeight.Black
+                        fontSize = if (compactEditor) 24.sp else 30.sp,
+                        fontWeight = FontWeight.Black,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
                 OverlayButton(
                     text = if (isSaving) stringResource(R.string.profile_saving)
                            else stringResource(R.string.profile_save),
+                    modifier = Modifier.focusRequester(saveFocusRequester).testTag("studio-profile-save"),
                     isPrimary = true,
-                    enabled = profileName.isNotBlank() && !isSaving,
+                    enabled = profileName.isNotBlank() && !isSaving && !studioBusy,
                     onClick = {
                         onSaveProfile(
                             profile.copy(
@@ -1851,25 +1866,27 @@ private fun EditProfileOverlay(
                 )
             }
 
-            Spacer(modifier = Modifier.height(NuvioTheme.spacing.xl))
+            Spacer(modifier = Modifier.height(if (compactEditor) 12.dp else NuvioTheme.spacing.xl))
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 360.dp),
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+                    .heightIn(min = if (compactEditor) 0.dp else 360.dp),
                 verticalAlignment = Alignment.Top
             ) {
                 Column(
                     modifier = Modifier
-                        .width(ProfileSelectionSpacing.EditorPreviewWidth)
-                        .padding(start = NuvioTheme.spacing.xl, top = NuvioTheme.spacing.xl + ProfileSelectionSpacing.EditorPreviewTopOffset, end = NuvioTheme.spacing.xl, bottom = NuvioTheme.spacing.xl),
+                        .width(if (compactEditor) 160.dp else ProfileSelectionSpacing.EditorPreviewWidth)
+                        .padding(if (compactEditor) 8.dp else NuvioTheme.spacing.xl),
                     verticalArrangement = Arrangement.spacedBy(18.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     ProfileAvatarCircle(
                         name = profileName.ifEmpty { "?" },
                         colorHex = selectedColorHex,
-                        size = ProfileSelectionSpacing.EditorPreviewAvatarSize,
+                        size = if (compactEditor) 56.dp else ProfileSelectionSpacing.EditorPreviewAvatarSize,
                         avatarImageUrl = previewAvatarImageUrl
                     )
 
@@ -1879,7 +1896,7 @@ private fun EditProfileOverlay(
                             textDirection = profileName.contentTextDirection()
                         ),
                         color = if (profileName.isBlank()) NuvioTheme.colors.TextSecondary else NuvioTheme.colors.TextPrimary,
-                        fontSize = 22.sp,
+                        fontSize = if (compactEditor) 16.sp else 22.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
                         maxLines = 2,
@@ -1895,7 +1912,8 @@ private fun EditProfileOverlay(
                     OverlayButton(
                         text = stringResource(R.string.profile_cancel),
                         isPrimary = true,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().testTag("studio-profile-cancel"),
+                        enabled = !studioBusy && !isSaving,
                         onClick = onDismiss
                     )
                 }
@@ -1911,11 +1929,13 @@ private fun EditProfileOverlay(
                     ProfileEditorTabs(
                         selectedTab = selectedEditorTab,
                         showBackgroundTab = hasProfileBackgroundAccess,
-                        onTabSelected = { selectedEditorTab = it },
+                        onTabSelected = { if (!studioBusy && !isSaving) selectedEditorTab = it },
+                        enabled = !studioBusy && !isSaving,
                         modifier = Modifier.align(Alignment.CenterHorizontally)
                     )
 
                     when (selectedEditorTab) {
+                        ProfileEditorTab.Studio -> ProfileStudioAvatarEditor(profile, onBusyChanged = { studioBusy = it })
                         ProfileEditorTab.Avatar -> {
                             Text(
                                 text = stringResource(R.string.profile_choose_avatar),

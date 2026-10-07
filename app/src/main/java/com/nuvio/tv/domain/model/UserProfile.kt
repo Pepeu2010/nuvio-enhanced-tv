@@ -9,7 +9,11 @@ data class UserProfile(
     val avatarId: String? = null,
     val avatarUrl: String? = null,
     val profileBackgroundId: String? = null,
-    val profileBackgroundUrl: String? = null
+    val profileBackgroundUrl: String? = null,
+    // Presentation identity only; never part of a remote profile push.
+    val studioIdentity: String = "",
+    val studioOwnerId: String? = null,
+    val studioRemoteId: String? = null
 ) {
     val isPrimary: Boolean get() = id == 1
 }
