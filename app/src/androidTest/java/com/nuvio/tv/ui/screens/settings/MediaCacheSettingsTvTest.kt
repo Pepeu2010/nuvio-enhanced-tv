@@ -1,6 +1,9 @@
 package com.nuvio.tv.ui.screens.settings
 
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.SharedPreferences
+import android.system.Os
 import android.graphics.Bitmap
 import android.view.KeyEvent
 import androidx.compose.foundation.background
@@ -18,6 +21,8 @@ import com.nuvio.tv.domain.model.NavigationMotion
 import com.nuvio.tv.ui.screens.detail.requestFocusAfterFrames
 import com.nuvio.tv.ui.theme.NuvioTheme
 import java.io.File
+import java.util.UUID
+import org.junit.After
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -27,7 +32,20 @@ import org.junit.runner.RunWith
 class MediaCacheSettingsTvTest {
     @get:Rule val compose = createComposeRule()
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
-    private val context get() = instrumentation.targetContext
+    private val fixtureId = "telumia_cache_test_" + UUID.randomUUID().toString()
+    private val fixtureDirectory by lazy { File(instrumentation.targetContext.cacheDir, fixtureId).apply { mkdirs() } }
+    private val context by lazy { object : ContextWrapper(instrumentation.targetContext) {
+        override fun getApplicationContext(): Context = this
+        override fun getCacheDir(): File = fixtureDirectory
+        override fun getSharedPreferences(name: String, mode: Int): SharedPreferences =
+            baseContext.getSharedPreferences(fixtureId + "_" + name, mode)
+    } }
+    @After fun removeOnlyOwnedFixtures() {
+        instrumentation.targetContext.deleteSharedPreferences(fixtureId + "_telumia_media_cache_v1")
+        require(fixtureDirectory.canonicalFile.parentFile == instrumentation.targetContext.cacheDir.canonicalFile)
+        require(fixtureDirectory.name == fixtureId)
+        fixtureDirectory.deleteRecursively()
+    }
 
     @Test fun remoteSelectsManualBudgetAndAutoWithoutChangingTheActiveBudget() {
         val focus = FocusRequester()
@@ -70,12 +88,55 @@ class MediaCacheSettingsTvTest {
 
     @Test fun futureSchemaFallsBackSafelyWithoutErasingThePreferenceFile() {
         val preferences = context.getSharedPreferences("telumia_media_cache_v1", Context.MODE_PRIVATE)
+        assertTrue(preferences.edit().putInt("schema", 999).putString("mode", "FUTURE")
+            .putString("unknown_future_field", "preserve-me").commit())
+        val original = preferences.all.toMap()
         val cache = TvMediaCache(context)
-        val previous = cache.loadSettings()
+        assertEquals(MediaCacheSettings(), cache.loadSettings())
+        assertFalse(cache.saveSettings(MediaCacheSettings(MediaCacheMode.MANUAL, 2048L * MIB)))
+        assertEquals(original, preferences.all)
+        assertEquals(999, preferences.getInt("schema", 0))
+        assertEquals(MediaCacheSettings(), TvMediaCache(context).loadSettings())
+    }
+
+    @Test fun wrongTypedSchemaCannotBeDowngradedBySaving() {
+        val preferences = context.getSharedPreferences("telumia_media_cache_v1", Context.MODE_PRIVATE)
+        assertTrue(preferences.edit().putString("schema", "next").putLong("future_limit", 42).commit())
+        val original = preferences.all.toMap()
+        val cache = TvMediaCache(context)
+        assertEquals(MediaCacheSettings(), cache.loadSettings())
+        assertFalse(cache.saveSettings(MediaCacheSettings()))
+        assertEquals(original, preferences.all)
+    }
+
+    @Test fun runtimeMeasurementCountsImageAndBadgeCachesAndExcludesDurableAndLinkedFiles() {
+        fun write(name: String, size: Int): File = File(context.cacheDir, name).apply {
+            parentFile!!.mkdirs(); writeBytes(ByteArray(size))
+        }
+        write("image_cache/image", 101)
+        write("badge_cache/badge", 23)
+        val avatar = write("profile-studio/avatar", 211)
+        val download = write("downloads/movie", 307)
+        val link = File(context.cacheDir, "image_cache/linked-profile")
+        Os.symlink(avatar.parentFile!!.absolutePath, link.absolutePath)
         try {
-            assertTrue(preferences.edit().putInt("schema", 999).putString("mode", "FUTURE").commit())
-            assertEquals(MediaCacheSettings(), TvMediaCache(context).loadSettings())
-            assertEquals(999, preferences.getInt("schema", 0))
-        } finally { assertTrue(cache.saveSettings(previous)) }
+            val cache = TvMediaCache(context)
+            assertTrue(cache.occupiedCache.complete)
+            assertEquals(124L, cache.occupiedCache.bytes)
+            assertEquals(211L, avatar.length())
+            assertEquals(307L, download.length())
+            assertEquals(124L, cache.deviceSnapshot.occupiedCacheBytes)
+            assertEquals(MediaCachePolicy.resolve(MediaCachePlatform.TV, cache.activeSettings, cache.deviceSnapshot), cache.activeBudget)
+        } finally { Os.unlink(link.absolutePath) }
+    }
+
+    @Test fun nativeDirectoryIterationStopsAtItsEntryBudget() {
+        val images = File(context.cacheDir, "image_cache").apply { mkdirs() }
+        repeat(20) { File(images, "$it").writeBytes(ByteArray(4)) }
+        val result = OwnedMediaCacheOccupancy.measure(context.cacheDir.toPath(), listOf(listOf("image_cache")),
+            maxEntries = 3, maxMillis = 10_000)
+        assertFalse(result.complete)
+        assertEquals(3, result.visitedEntries)
+        assertEquals(8L, result.bytes)
     }
 }

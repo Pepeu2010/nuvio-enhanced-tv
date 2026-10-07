@@ -398,7 +398,8 @@ sentry {
 }
 
 dependencies {
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // Bounded NIO directory iteration also needs to work on the supported API 24/25 TVs.
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.4")
     val composeBom = platform("androidx.compose:compose-bom:2026.05.01")
 
     // Source-retention nullness annotations (MonotonicNonNull / RequiresNonNull /
