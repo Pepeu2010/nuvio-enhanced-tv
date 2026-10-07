@@ -5,6 +5,8 @@ import com.nuvio.tv.ui.util.contentTextDirection
 import com.nuvio.tv.ui.theme.NuvioMotion
 
 import com.nuvio.tv.ui.theme.NuvioTheme
+import com.nuvio.tv.ui.theme.LocalUiMotion
+import com.nuvio.tv.ui.theme.TelumiaDisplayFamily
 import com.nuvio.tv.ui.theme.ThemeColors
 import com.nuvio.tv.ui.theme.brandWordmarkResource
 import com.nuvio.tv.ui.theme.createFocusRingStyle
@@ -162,7 +164,7 @@ private object ProfileSelectionSpacing {
     val PinSupportMaxWidth = 720.dp
 }
 
-private sealed interface ProfileBackgroundArtwork {
+internal sealed interface ProfileBackgroundArtwork {
     data class Catalog(val background: ProfileBackgroundCatalogItem) : ProfileBackgroundArtwork
     data class Custom(val url: String) : ProfileBackgroundArtwork
 }
@@ -268,6 +270,7 @@ fun ProfileSelectionScreen(
             )
         }
     }
+    val motionPolicy = LocalUiMotion.current
     val isManagementMode = screenMode == ProfileSelectionMode.Management
     val screenTitle = if (isManagementMode) {
         stringResource(R.string.profile_manage_title)
@@ -366,16 +369,18 @@ fun ProfileSelectionScreen(
         AnimatedContent(
             targetState = pinOverlayState,
             transitionSpec = {
-                val entering = fadeIn(tween(240)) + slideInHorizontally(
-                    animationSpec = tween(320, easing = ProfileCardFocusEasing),
+                val entering = fadeIn(tween(motionPolicy.durationMillis(240))) + slideInHorizontally(
+                    animationSpec = tween(motionPolicy.durationMillis(320), easing = ProfileCardFocusEasing),
                     initialOffsetX = { fullWidth ->
-                        if (targetState == null) -fullWidth / 10 else fullWidth / 12
+                        if (!motionPolicy.allowsSpatialEffects) 0
+                        else if (targetState == null) -fullWidth / 10 else fullWidth / 12
                     }
                 )
-                val exiting = fadeOut(tween(NuvioMotion.tokens.durations.fast)) + slideOutHorizontally(
-                    animationSpec = tween(240),
+                val exiting = fadeOut(tween(motionPolicy.durationMillis(180))) + slideOutHorizontally(
+                    animationSpec = tween(motionPolicy.durationMillis(240)),
                     targetOffsetX = { fullWidth ->
-                        if (targetState == null) fullWidth / 12 else -fullWidth / 12
+                        if (!motionPolicy.allowsSpatialEffects) 0
+                        else if (targetState == null) fullWidth / 12 else -fullWidth / 12
                     }
                 )
                 entering togetherWith exiting
@@ -391,6 +396,7 @@ fun ProfileSelectionScreen(
                     isManagementMode = isManagementMode,
                     profiles = profiles,
                     activeProfileId = activeProfileId,
+                    preferredFocusId = focusedProfileId,
                     canAddProfile = viewModel.canAddProfile,
                     profilePinEnabled = profilePinEnabled,
                     avatarImageUrlsById = avatarImageUrlsById,
@@ -812,28 +818,28 @@ fun ProfileSelectionScreen(
 }
 
 @Composable
-private fun ProfileSelectionBackground(
+internal fun ProfileSelectionBackground(
     focusedAvatarColor: Color,
     profileBackground: ProfileBackgroundArtwork?
 ) {
+    val motionPolicy = LocalUiMotion.current
     val animatedAvatarColor by animateColorAsState(
         targetValue = focusedAvatarColor,
-        animationSpec = tween(durationMillis = 520),
+        animationSpec = tween(durationMillis = motionPolicy.durationMillis(320)),
         label = "focusedAvatarColor"
     )
-    // Use fixed dark colors so the gradient is consistent.
-    // Otherwise, profile selector and splash screen needs to know about user template
-    val baseBg = Color(0xFF121212)
-    val baseBgElevated = Color(0xFF1E1E1E)
-    val gradientTop = lerp(baseBgElevated, animatedAvatarColor, 0.3f)
-    val gradientMid = lerp(baseBg, animatedAvatarColor, 0.14f)
-    val halfFadeStrong = animatedAvatarColor.copy(alpha = 0.26f)
+    val baseBg = Color(0xFF080E18)
+    val baseBgElevated = Color(0xFF152335)
+    val gradientTop = lerp(baseBgElevated, animatedAvatarColor, 0.18f)
+    val gradientMid = lerp(baseBg, animatedAvatarColor, 0.08f)
+    val halfFadeStrong = animatedAvatarColor.copy(alpha = 0.16f)
     val halfFadeSoft = animatedAvatarColor.copy(alpha = 0.08f)
 
+    Box(Modifier.fillMaxSize().background(baseBg))
     AnimatedContent(
         targetState = profileBackground,
         transitionSpec = {
-            fadeIn(tween(320)) togetherWith fadeOut(tween(240))
+            fadeIn(tween(motionPolicy.durationMillis(240))) togetherWith fadeOut(tween(motionPolicy.durationMillis(180)))
         },
         contentKey = { background ->
             when (background) {
@@ -849,12 +855,14 @@ private fun ProfileSelectionBackground(
             is ProfileBackgroundArtwork.Catalog -> ProfileBackgroundImage(
                 background = background.background,
                 contentDescription = null,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                imageCrossfade = false
             )
             is ProfileBackgroundArtwork.Custom -> CustomProfileBackgroundImage(
                 imageUrl = background.url,
                 contentDescription = null,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                imageCrossfade = false
             )
             null -> {
                 Box(
@@ -884,10 +892,15 @@ private fun ProfileSelectionBackground(
             }
         }
     }
+    if (profileBackground != null) {
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(
+            baseBg.copy(alpha = .76f), baseBg.copy(alpha = .86f), baseBg.copy(alpha = .94f)
+        ))))
+    }
 }
 
 @Composable
-private fun ProfileSelectionMainContent(
+internal fun ProfileSelectionMainContent(
     screenTitle: String,
     screenSubtitle: String,
     screenHint: String,
@@ -902,69 +915,34 @@ private fun ProfileSelectionMainContent(
     onProfileFocused: (UserProfile?) -> Unit,
     onProfileSelected: (UserProfile) -> Unit,
     onProfileLongPress: (UserProfile) -> Unit,
-    onAddProfileClick: () -> Unit
+    onAddProfileClick: () -> Unit,
+    preferredFocusId: Int? = null
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(
-                horizontal = ProfileSelectionSpacing.ScreenPaddingHorizontal,
-                vertical = ProfileSelectionSpacing.ScreenPaddingVertical
-            ),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        MemberBrandWordmark(
-            height = ProfileSelectionSpacing.LogoHeight,
-            contentDescription = stringResource(R.string.cd_nuvio_logo),
-            drawableOverride = brandWordmarkRes
-        )
-
-        Spacer(modifier = Modifier.height(ProfileSelectionSpacing.LogoToHeading))
-
-        Text(
-            text = screenTitle,
-            color = NuvioTheme.colors.TextPrimary,
-            fontSize = 44.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = (-0.5).sp
-        )
-
-        Spacer(modifier = Modifier.height(ProfileSelectionSpacing.HeadingToSubheading))
-
-        Text(
-            text = screenSubtitle,
-            color = NuvioTheme.colors.TextSecondary,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Medium
-        )
-
-        Spacer(modifier = Modifier.weight(1f, fill = true))
-
-        ProfileGrid(
-            profiles = profiles,
-            activeProfileId = activeProfileId,
-            isManagementMode = isManagementMode,
-            canAddProfile = canAddProfile,
-            profilePinEnabled = profilePinEnabled,
-            avatarImageUrlsById = avatarImageUrlsById,
-            profileThemes = profileThemes,
-            onProfileFocused = onProfileFocused,
-            onProfileSelected = onProfileSelected,
-            onProfileLongPress = onProfileLongPress,
-            onAddProfileClick = onAddProfileClick
-        )
-
-        Spacer(modifier = Modifier.weight(1f, fill = true))
-
-        Text(
-            text = screenHint,
-            color = NuvioTheme.colors.TextTertiary.copy(alpha = 0.9f),
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium
-        )
+    BoxWithConstraints(Modifier.fillMaxSize().testTag("tv-profile-selection")) {
+        val dense = maxHeight < 440.dp
+        Column(Modifier.fillMaxSize().padding(horizontal = if(dense)24.dp else 56.dp,
+            vertical = if(dense)16.dp else 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            MemberBrandWordmark(height = if(dense)22.dp else 32.dp,
+                contentDescription = stringResource(R.string.cd_nuvio_logo),drawableOverride=brandWordmarkRes)
+            Spacer(Modifier.height(if(dense)6.dp else 16.dp))
+            Text(screenTitle,color=Color(0xFFF4EEDD),fontSize=if(dense)28.sp else 40.sp,
+                fontFamily=TelumiaDisplayFamily,fontWeight=FontWeight.SemiBold,
+                letterSpacing=(-0.8).sp,maxLines=1,overflow=TextOverflow.Ellipsis)
+            Spacer(Modifier.height(4.dp))
+            Text(screenSubtitle,color=Color(0xFFB7BCC5),fontSize=if(dense)12.sp else 16.sp,
+                maxLines=1,overflow=TextOverflow.Ellipsis)
+            Spacer(Modifier.height(if(dense)10.dp else 20.dp))
+            Box(Modifier.weight(1f).fillMaxWidth(),contentAlignment=Alignment.Center) {
+                ProfileGrid(profiles,activeProfileId,isManagementMode,canAddProfile,profilePinEnabled,
+                    avatarImageUrlsById,profileThemes,onProfileFocused,onProfileSelected,onProfileLongPress,
+                    onAddProfileClick,dense,preferredFocusId)
+            }
+            Spacer(Modifier.height(if(dense)8.dp else 20.dp))
+            Text(screenHint,color=Color(0xFFB7BCC5),fontSize=if(dense)11.sp else 14.sp,
+                fontWeight=FontWeight.Medium,maxLines=1,overflow=TextOverflow.Ellipsis)
+        }
     }
 }
-
 @Composable
 private fun ProfileGrid(
     profiles: List<UserProfile>,
@@ -977,11 +955,13 @@ private fun ProfileGrid(
     onProfileFocused: (UserProfile?) -> Unit,
     onProfileSelected: (UserProfile) -> Unit,
     onProfileLongPress: (UserProfile) -> Unit,
-    onAddProfileClick: () -> Unit
+    onAddProfileClick: () -> Unit,
+    dense: Boolean = false,
+    preferredFocusId: Int? = null
 ) {
     val totalItems = profiles.size + if (canAddProfile) 1 else 0
     val initialFocusIndex = remember(profiles, activeProfileId, canAddProfile) {
-        profiles.indexOfFirst { it.id == activeProfileId }
+        profiles.indexOfFirst { it.id == (preferredFocusId ?: activeProfileId) }
             .takeIf { it >= 0 }
             ?: if (profiles.isNotEmpty()) 0 else if (canAddProfile) 0 else -1
     }
@@ -1008,28 +988,20 @@ private fun ProfileGrid(
             modifier = Modifier.fillMaxWidth(),
             contentAlignment = Alignment.Center
         ) {
-            val defaultGridWidth = profileGridWidth(
-                itemCount = totalItems,
-                cardWidth = ProfileSelectionSpacing.CardWidth,
-                itemGap = ProfileSelectionSpacing.GridItemGap
-            )
-            val fullSizeTightGridWidth = profileGridWidth(
-                itemCount = totalItems,
-                cardWidth = ProfileSelectionSpacing.CardWidth,
-                itemGap = ProfileSelectionSpacing.CompactGridItemGap
-            )
-            val useCompactCards = defaultGridWidth > maxWidth && fullSizeTightGridWidth > maxWidth
-            val gridItemGap = if (defaultGridWidth > maxWidth) {
-                ProfileSelectionSpacing.CompactGridItemGap
-            } else {
-                ProfileSelectionSpacing.GridItemGap
-            }
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(gridItemGap),
-                verticalAlignment = Alignment.Top
-            ) {
-                profiles.forEachIndexed { index, profile ->
+            val gridItemGap = if (dense) 12.dp else 16.dp
+            val minimumWidth = if (dense) 112.dp else 128.dp
+            val availableColumns = ((maxWidth + gridItemGap) / (minimumWidth + gridItemGap)).toInt().coerceAtLeast(1)
+            val rows = (totalItems + availableColumns - 1) / availableColumns
+            val columns = ((totalItems + rows - 1) / rows).coerceAtLeast(1)
+            val cardWidth = ((maxWidth - gridItemGap * (columns - 1)) / columns)
+                .coerceAtMost(if(dense)156.dp else 176.dp)
+            val useCompactCards = dense || cardWidth < 152.dp
+            Column(verticalArrangement=Arrangement.spacedBy(gridItemGap), horizontalAlignment=Alignment.CenterHorizontally) {
+              for(rowStart in 0 until totalItems step columns) {
+               Row(horizontalArrangement=Arrangement.spacedBy(gridItemGap),verticalAlignment=Alignment.Top) {
+                for(index in rowStart until minOf(rowStart+columns,totalItems)) {
+                 if(index < profiles.size) {
+                    val profile=profiles[index]
                     ProfileCard(
                         profile = profile,
                         avatarImageUrl = rememberStudioAvatarImage(profile) ?: profile.avatarUrl?.takeIf { it.isNotBlank() }
@@ -1039,30 +1011,24 @@ private fun ProfileGrid(
                         profileTheme = profileThemes[profile.id],
                         onFocused = { onProfileFocused(profile) },
                         onClick = { onProfileSelected(profile) },
-                        onLongPress = { onProfileLongPress(profile) }
+                        onLongPress = { onProfileLongPress(profile) },
+                        dense=dense,cardWidth=cardWidth,protectedByPin=profilePinEnabled[profile.id] == true
                     )
-                }
-                if (canAddProfile) {
+                 } else {
                     AddProfileCard(
                         focusRequester = focusRequesters[profiles.size],
                         compact = useCompactCards,
                         onFocused = { onProfileFocused(null) },
-                        onClick = onAddProfileClick
+                        onClick = onAddProfileClick,
+                        dense=dense,cardWidth=cardWidth
                     )
+                 }
                 }
+               }
+              }
             }
         }
     }
-}
-
-private fun profileGridWidth(
-    itemCount: Int,
-    cardWidth: Dp,
-    itemGap: Dp
-): Dp {
-    if (itemCount <= 0) return 0.dp
-    val gapCount = itemCount - 1
-    return (cardWidth.value * itemCount + itemGap.value * gapCount).dp
 }
 
 @Composable
@@ -1074,15 +1040,19 @@ private fun ProfileCard(
     profileTheme: com.nuvio.tv.domain.model.AppTheme? = null,
     onFocused: () -> Unit,
     onClick: () -> Unit,
-    onLongPress: () -> Unit
+    onLongPress: () -> Unit,
+    dense: Boolean = false,
+    cardWidth: Dp = ProfileSelectionSpacing.CardWidth,
+    protectedByPin: Boolean = false
 ) {
+    val motion=NuvioTheme.motion
     var isFocused by remember { mutableStateOf(false) }
     var longPressTriggered by remember { mutableStateOf(false) }
     val longPressKeyTracker = rememberLongPressKeyTracker()
     val interactionSource = remember { MutableInteractionSource() }
     val focusProgress by animateFloatAsState(
         targetValue = if (isFocused) 1f else 0f,
-        animationSpec = tween(durationMillis = 210, easing = ProfileCardFocusEasing),
+        animationSpec = tween(durationMillis = motion.durations.fast, easing = ProfileCardFocusEasing),
         label = "profileFocusProgress"
     )
     val profileFocusRing = remember(profileTheme) {
@@ -1090,15 +1060,15 @@ private fun ProfileCard(
             createFocusRingStyle(ThemeColors.getColorPalette(it))
         }
     }
-    val itemScale = 1f + (0.04f * focusProgress)
+    val itemScale = 1f + ((motion.focusScale-1f) * focusProgress)
     val avatarSize = androidx.compose.ui.unit.lerp(
-        if (compact) ProfileSelectionSpacing.CompactAvatarSize else 96.dp,
-        if (compact) ProfileSelectionSpacing.CompactFocusedAvatarSize else 102.dp,
+        if(dense)64.dp else if(compact)90.dp else 112.dp,
+        if(dense)64.dp else if(compact)90.dp else 112.dp,
         focusProgress
     )
     val outerAvatarSize = androidx.compose.ui.unit.lerp(
-        if (compact) ProfileSelectionSpacing.CompactOuterAvatarSize else 114.dp,
-        if (compact) ProfileSelectionSpacing.CompactFocusedOuterAvatarSize else 122.dp,
+        if(dense)66.dp else if(compact)94.dp else 116.dp,
+        if(dense)66.dp else if(compact)94.dp else 116.dp,
         focusProgress
     )
     val ringWidth = androidx.compose.ui.unit.lerp(NuvioTheme.spacing.hairline, 3.dp, focusProgress)
@@ -1111,14 +1081,16 @@ private fun ProfileCard(
 
     Column(
         modifier = Modifier
-            .width(
-                if (compact) ProfileSelectionSpacing.CompactCardWidth
-                else ProfileSelectionSpacing.CardWidth
-            )
+            .testTag("tv-profile-card-${profile.id}")
+            .width(cardWidth)
             .graphicsLayer {
                 scaleX = itemScale
                 scaleY = itemScale
             }
+            .clip(RoundedCornerShape(18.dp))
+            .background(if(isFocused) Color(0xFF1D2938) else Color(0xFF101B29))
+            .border(if(isFocused)2.dp else 1.dp,
+                if(isFocused)Color(0xFFE8BE72) else Color(0xFF293746),RoundedCornerShape(18.dp))
             .focusRequester(focusRequester)
             .onFocusChanged {
                 isFocused = it.isFocused
@@ -1159,29 +1131,28 @@ private fun ProfileCard(
             )
             .padding(
                 horizontal = ProfileSelectionSpacing.CardPaddingHorizontal,
-                vertical = ProfileSelectionSpacing.CardPaddingVertical
+                vertical = if(dense)6.dp else 12.dp
             ),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             modifier = Modifier.size(
-                if (compact) ProfileSelectionSpacing.CompactAvatarContainer
-                else ProfileSelectionSpacing.AvatarContainer
+                if(dense)66.dp else if(compact)94.dp else 116.dp
             ),
             contentAlignment = Alignment.Center
         ) {
             Box(
                 modifier = Modifier
                     .size(outerAvatarSize)
-                    .clip(CircleShape)
+                    .clip(RoundedCornerShape(14.dp))
                     .border(
                         width = NuvioTheme.spacing.hairline,
                         color = NuvioTheme.colors.Border.copy(alpha = 0.75f),
-                        shape = CircleShape
+                        shape = RoundedCornerShape(14.dp)
                     )
                     .border(
                         border = (profileFocusRing ?: NuvioTheme.focusRing).border(ringWidth, focusProgress),
-                        shape = CircleShape
+                        shape = RoundedCornerShape(14.dp)
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -1189,29 +1160,32 @@ private fun ProfileCard(
                     name = profile.name,
                     colorHex = profile.avatarColorHex,
                     size = avatarSize,
-                    avatarImageUrl = avatarImageUrl
+                    avatarImageUrl = avatarImageUrl,
+                    imageCrossfade = false,
+                    shape = RoundedCornerShape(14.dp)
                 )
             }
 
-            if (profile.isPrimary) {
+            if (profile.isPrimary || protectedByPin) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .offset(x = NuvioTheme.spacing.xxs, y = NuvioTheme.spacing.hairline)
-                        .size(if (compact) 22.dp else 26.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFFFB300), CircleShape)
+                        .width(if (protectedByPin) 32.dp else 24.dp)
+                        .height(24.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFFE8BE72), RoundedCornerShape(8.dp))
                         .border(
                             width = NuvioTheme.spacing.xxs,
                             color = NuvioTheme.colors.Background,
-                            shape = CircleShape
+                            shape = RoundedCornerShape(8.dp)
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "\u2605",
-                        color = Color.White,
-                        fontSize = if (compact) 12.sp else 14.sp,
+                        text = if(protectedByPin) "PIN" else "\u2605",
+                        color = Color(0xFF080E18),
+                        fontSize = if (protectedByPin) 9.sp else 14.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
                     )
@@ -1221,7 +1195,7 @@ private fun ProfileCard(
 
         Spacer(
             modifier = Modifier.height(
-                if (compact) ProfileSelectionSpacing.CompactAvatarToName
+                if(dense)6.dp else if (compact) ProfileSelectionSpacing.CompactAvatarToName
                 else ProfileSelectionSpacing.AvatarToName
             )
         )
@@ -1232,13 +1206,14 @@ private fun ProfileCard(
                 textDirection = profile.name.contentTextDirection()
             ),
             color = nameColor,
-            fontSize = if (compact) 15.sp else 17.sp,
+            fontSize = if(dense)13.sp else if (compact) 15.sp else 17.sp,
             fontWeight = nameWeight,
             textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
 
+        if(!dense) {
         Spacer(modifier = Modifier.height(ProfileSelectionSpacing.NameToMeta))
 
         Box(
@@ -1248,12 +1223,13 @@ private fun ProfileCard(
             if (profile.isPrimary) {
                 Text(
                     text = stringResource(R.string.profile_selection_primary_badge),
-                    color = Color(0xFFFFB300),
+                    color = Color(0xFFE8BE72),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 0.8.sp
                 )
             }
+        }
         }
     }
 }
@@ -1268,19 +1244,22 @@ private fun AddProfileCard(
     focusRequester: FocusRequester,
     compact: Boolean,
     onFocused: () -> Unit,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    dense: Boolean = false,
+    cardWidth: Dp = ProfileSelectionSpacing.CardWidth
 ) {
+    val motion=NuvioTheme.motion
     var isFocused by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
     val focusProgress by animateFloatAsState(
         targetValue = if (isFocused) 1f else 0f,
-        animationSpec = tween(durationMillis = 210, easing = ProfileCardFocusEasing),
+        animationSpec = tween(durationMillis = motion.durations.fast, easing = ProfileCardFocusEasing),
         label = "addFocusProgress"
     )
-    val itemScale = 1f + (0.04f * focusProgress)
+    val itemScale = 1f + ((motion.focusScale-1f) * focusProgress)
     val outerAvatarSize = androidx.compose.ui.unit.lerp(
-        if (compact) ProfileSelectionSpacing.CompactOuterAvatarSize else 114.dp,
-        if (compact) ProfileSelectionSpacing.CompactFocusedOuterAvatarSize else 122.dp,
+        if(dense)66.dp else if(compact)94.dp else 116.dp,
+        if(dense)66.dp else if(compact)94.dp else 116.dp,
         focusProgress
     )
     val ringWidth = androidx.compose.ui.unit.lerp(NuvioTheme.spacing.hairline, 3.dp, focusProgress)
@@ -1302,14 +1281,16 @@ private fun AddProfileCard(
 
     Column(
         modifier = Modifier
-            .width(
-                if (compact) ProfileSelectionSpacing.CompactCardWidth
-                else ProfileSelectionSpacing.CardWidth
-            )
+            .testTag("tv-profile-add")
+            .width(cardWidth)
             .graphicsLayer {
                 scaleX = itemScale
                 scaleY = itemScale
             }
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color(0xFF101B29))
+            .border(if(isFocused)2.dp else 1.dp,
+                if(isFocused)Color(0xFFE8BE72) else Color(0xFF293746),RoundedCornerShape(18.dp))
             .focusRequester(focusRequester)
             .onFocusChanged {
                 isFocused = it.isFocused
@@ -1322,31 +1303,30 @@ private fun AddProfileCard(
             )
             .padding(
                 horizontal = ProfileSelectionSpacing.CardPaddingHorizontal,
-                vertical = ProfileSelectionSpacing.CardPaddingVertical
+                vertical = if(dense)6.dp else 12.dp
             ),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             modifier = Modifier.size(
-                if (compact) ProfileSelectionSpacing.CompactAvatarContainer
-                else ProfileSelectionSpacing.AvatarContainer
+                if(dense)66.dp else if(compact)94.dp else 116.dp
             ),
             contentAlignment = Alignment.Center
         ) {
             Box(
                 modifier = Modifier
                     .size(outerAvatarSize)
-                    .clip(CircleShape)
+                    .clip(RoundedCornerShape(14.dp))
                     .border(
                         width = NuvioTheme.spacing.hairline,
                         color = NuvioTheme.colors.Border.copy(alpha = 0.5f),
-                        shape = CircleShape
+                        shape = RoundedCornerShape(14.dp)
                     )
                     .border(
                         border = NuvioTheme.focusRing.border(ringWidth, focusProgress),
-                        shape = CircleShape
+                        shape = RoundedCornerShape(14.dp)
                     )
-                    .background(addBackgroundColor, CircleShape),
+                    .background(addBackgroundColor, RoundedCornerShape(14.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Box(
@@ -1373,7 +1353,7 @@ private fun AddProfileCard(
 
         Spacer(
             modifier = Modifier.height(
-                if (compact) ProfileSelectionSpacing.CompactAvatarToName
+                if(dense)6.dp else if (compact) ProfileSelectionSpacing.CompactAvatarToName
                 else ProfileSelectionSpacing.AvatarToName
             )
         )
@@ -1381,15 +1361,17 @@ private fun AddProfileCard(
         Text(
             text = stringResource(R.string.profile_add_new),
             color = nameColor,
-            fontSize = if (compact) 15.sp else 17.sp,
+            fontSize = if(dense)13.sp else if (compact) 15.sp else 17.sp,
             fontWeight = if (isFocused) FontWeight.SemiBold else FontWeight.Medium,
             textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
 
-        Spacer(modifier = Modifier.height(ProfileSelectionSpacing.NameToMeta))
-        Box(modifier = Modifier.height(ProfileSelectionSpacing.MetaSlotHeight))
+        if(!dense) {
+            Spacer(modifier = Modifier.height(ProfileSelectionSpacing.NameToMeta))
+            Box(modifier = Modifier.height(ProfileSelectionSpacing.MetaSlotHeight))
+        }
     }
 }
 

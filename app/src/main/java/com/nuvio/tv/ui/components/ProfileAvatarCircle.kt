@@ -7,10 +7,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -30,10 +36,12 @@ fun ProfileAvatarCircle(
     size: Dp = 80.dp,
     isSelected: Boolean = false,
     avatarImageUrl: String? = null,
-    imageCrossfade: Boolean = true
+    imageCrossfade: Boolean = true,
+    shape: Shape = CircleShape,
+    onImageError: () -> Unit = {}
 ) {
     val avatarColor = runCatching { Color(android.graphics.Color.parseColor(colorHex)) }
-        .getOrDefault(Color(0xFF1E88E5))
+        .getOrDefault(Color(0xFF1E88E5)).compositeOver(Color(0xFF080E18))
     val initial = name.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
     val fontSize = (size.value * 0.4f).sp
     val context = LocalContext.current
@@ -45,36 +53,40 @@ fun ProfileAvatarCircle(
                 .build()
         }
     }
+    var photoReady by remember(imageRequest) { mutableStateOf(false) }
 
     Box(
         modifier = modifier
             .size(size)
-            .clip(CircleShape)
-            .background(avatarColor, CircleShape)
+            .clip(shape)
+            .background(avatarColor, shape)
             .then(
                 if (isSelected) {
-                    Modifier.border(3.dp, Color.White, CircleShape)
+                    Modifier.border(3.dp, Color.White, shape)
                 } else {
                     Modifier
                 }
             ),
         contentAlignment = Alignment.Center
     ) {
+        if (!photoReady) {
+            Text(
+                text = initial,
+                color = if (avatarColor.luminance() > 0.179f) Color.Black else Color.White,
+                fontSize = fontSize,
+                fontWeight = FontWeight.Bold
+            )
+        }
         if (imageRequest != null) {
             AsyncImage(
                 model = imageRequest,
                 contentDescription = name,
                 modifier = Modifier
                     .size(size)
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop
-            )
-        } else {
-            Text(
-                text = initial,
-                color = Color.White,
-                fontSize = fontSize,
-                fontWeight = FontWeight.Bold
+                    .clip(shape),
+                contentScale = ContentScale.Crop,
+                onSuccess = { photoReady = true },
+                onError = { photoReady = false; onImageError() }
             )
         }
     }

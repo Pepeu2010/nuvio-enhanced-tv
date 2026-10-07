@@ -190,7 +190,8 @@ private fun ProfileBackgroundItem(
 fun ProfileBackgroundImage(
     background: ProfileBackgroundCatalogItem,
     contentDescription: String?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    imageCrossfade: Boolean = true
 ) {
     val context = LocalContext.current
     AsyncImage(
@@ -199,7 +200,7 @@ fun ProfileBackgroundImage(
             .memoryCacheKey("profile-background-${background.id}-v${background.assetVersion}")
             .diskCachePolicy(CachePolicy.DISABLED)
             .allowRgb565(false)
-            .crossfade(true)
+            .crossfade(imageCrossfade)
             .build(),
         contentDescription = contentDescription,
         modifier = modifier,
@@ -211,7 +212,8 @@ fun ProfileBackgroundImage(
 fun CustomProfileBackgroundImage(
     imageUrl: String,
     contentDescription: String?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    imageCrossfade: Boolean = true
 ) {
     val context = LocalContext.current
     AsyncImage(
@@ -221,7 +223,7 @@ fun CustomProfileBackgroundImage(
             .diskCacheKey("custom-profile-background-$imageUrl")
             .diskCachePolicy(com.nuvio.tv.core.storage.tvMediaCache(context).requestPolicy)
             .allowRgb565(false)
-            .crossfade(true)
+            .crossfade(imageCrossfade)
             .build(),
         contentDescription = contentDescription,
         modifier = modifier,
