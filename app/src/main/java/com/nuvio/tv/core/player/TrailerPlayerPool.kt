@@ -15,6 +15,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOf
 
 /**
  * Application-scoped singleton that holds a single ExoPlayer instance dedicated to
@@ -31,10 +35,15 @@ import kotlinx.coroutines.flow.first
  */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Singleton
-class TrailerPlayerPool @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val playerSettingsDataStore: PlayerSettingsDataStore
+class TrailerPlayerPool private constructor(
+    private val context: Context,
+    nativeAllocationPreference: Flow<Boolean>
 ) {
+    @Inject constructor(@ApplicationContext context: Context, settings: PlayerSettingsDataStore) :
+        this(context, settings.nuvioPerformanceModeEnabled)
+
+    /** Native QA exercises the real pool without account/backend preference setup. */
+    internal constructor(context: Context, forceNative: Boolean) : this(context, flowOf(forceNative))
     companion object {
         private const val TAG = "TrailerPlayerPool"
     }
@@ -42,6 +51,11 @@ class TrailerPlayerPool @Inject constructor(
     private var _player: ExoPlayer? = null
     private val yielded = AtomicBoolean(false)
     private val released = AtomicBoolean(false)
+    private val owner = MutableStateFlow<Any?>(null)
+    internal val activeOwner = owner.asStateFlow()
+    private val generation = MutableStateFlow(0L)
+    internal val availabilityGeneration = generation.asStateFlow()
+    internal fun isOwner(token: Any): Boolean = owner.value === token
 
     @Volatile
     private var cachedForceNative: Boolean = false
@@ -50,7 +64,7 @@ class TrailerPlayerPool @Inject constructor(
         Thread {
             try {
                 cachedForceNative = kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
-                    playerSettingsDataStore.nuvioPerformanceModeEnabled.first()
+                    nativeAllocationPreference.first()
                 }
             } catch (_: Exception) {
                 cachedForceNative = false
@@ -62,13 +76,20 @@ class TrailerPlayerPool @Inject constructor(
      * Returns the shared trailer ExoPlayer, creating it lazily if needed.
      * Returns null only if [release] was called (process shutdown).
      */
-    fun acquire(): ExoPlayer? {
-        if (released.get()) return null
-        if (yielded.get()) {
-            // Reclaim was not called yet but someone wants the player — rebuild.
-            reclaim()
+    fun acquire(token: Any): ExoPlayer? {
+        // Full playback retains its decoder handoff until an explicit reclaim.
+        if (released.get() || yielded.get()) return null
+        val player = _player ?: createPlayer().also { _player = it }
+        if (!isOwner(token)) {
+            stop()
+            owner.value = token
         }
-        return _player ?: createPlayer().also { _player = it }
+        return player
+    }
+
+    /** A disappearing old card cannot stop the preview that took over its slot. */
+    fun stop(token: Any) {
+        if (owner.compareAndSet(token, null)) stopPlayer()
     }
 
     /**
@@ -76,6 +97,11 @@ class TrailerPlayerPool @Inject constructor(
      * Call this when the trailer is no longer visible (poster lost focus, screen change).
      */
     fun stop() {
+        owner.value = null
+        stopPlayer()
+    }
+
+    private fun stopPlayer() {
         _player?.let { player ->
             runCatching {
                 player.playWhenReady = false
@@ -91,6 +117,7 @@ class TrailerPlayerPool @Inject constructor(
      */
     fun yield() {
         if (yielded.compareAndSet(false, true)) {
+            owner.value = null
             Log.d(TAG, "Yielding trailer player for detail playback")
             _player?.let { player ->
                 runCatching { player.stop() }
@@ -98,6 +125,7 @@ class TrailerPlayerPool @Inject constructor(
                 runCatching { player.release() }
             }
             _player = null
+            generation.value++
         }
     }
 
@@ -107,6 +135,7 @@ class TrailerPlayerPool @Inject constructor(
     fun reclaim() {
         if (released.get()) return
         if (yielded.compareAndSet(true, false)) {
+            generation.value++
             Log.d(TAG, "Reclaiming trailer player")
             // Player will be lazily created on next acquire()
         }
@@ -117,12 +146,14 @@ class TrailerPlayerPool @Inject constructor(
      */
     fun release() {
         if (released.compareAndSet(false, true)) {
+            owner.value = null
             _player?.let { player ->
                 runCatching { player.stop() }
                 runCatching { player.clearMediaItems() }
                 runCatching { player.release() }
             }
             _player = null
+            generation.value++
         }
     }
 
@@ -131,11 +162,13 @@ class TrailerPlayerPool @Inject constructor(
         Log.d(TAG, "Creating shared trailer ExoPlayer instance with forceNativeAllocation = $forceNative")
         val loadControlBuilder = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                /* minBufferMs = */ 30_000,
-                /* maxBufferMs = */ 120_000,
-                /* bufferForPlaybackMs = */ 5_000,
-                /* bufferForPlaybackAfterRebufferMs = */ 10_000
+                /* minBufferMs = */ 1_000,
+                /* maxBufferMs = */ 10_000,
+                /* bufferForPlaybackMs = */ 400,
+                /* bufferForPlaybackAfterRebufferMs = */ 750
             )
+            .setTargetBufferBytes(16 * 1024 * 1024)
+            .setPrioritizeTimeOverSizeThresholds(false)
         if (forceNative) {
             val allocator = DefaultAllocator(
                 /* trimOnReset = */ true,
@@ -149,10 +182,9 @@ class TrailerPlayerPool @Inject constructor(
         val trackSelector = DefaultTrackSelector(context).apply {
             setParameters(
                 buildUponParameters()
-                    .setMaxVideoSizeSd()
-                    .clearVideoSizeConstraints()
-                    .setForceHighestSupportedBitrate(true)
-                    .setMaxVideoSize(Integer.MAX_VALUE, Integer.MAX_VALUE)
+                    .setMaxVideoSize(1280, 720)
+                    .setMaxVideoBitrate(4_000_000)
+                    .setExceedVideoConstraintsIfNecessary(false)
             )
         }
         return ExoPlayer.Builder(context)
@@ -160,13 +192,14 @@ class TrailerPlayerPool @Inject constructor(
             .setTrackSelector(trackSelector)
             .setBandwidthMeter(
                 DefaultBandwidthMeter.Builder(context)
-                    .setInitialBitrateEstimate(50_000_000L) // 50 Mbps – force highest HLS variant from start
+                    .setInitialBitrateEstimate(4_000_000L)
                     .build()
             )
             .setVideoChangeFrameRateStrategy(C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_ONLY_IF_SEAMLESS)
             .build()
             .apply {
                 repeatMode = Player.REPEAT_MODE_OFF
+                volume = 0f
             }
     }
 }

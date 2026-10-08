@@ -351,7 +351,10 @@ fun ModernHomeContent(
             lastRequestedTrailerFocusKey = null
             return@LaunchedEffect
         }
-        if (verticalRowListState.isScrollInProgress) return@LaunchedEffect
+        if (verticalRowListState.isScrollInProgress) {
+            lastRequestedTrailerFocusKey = null
+            return@LaunchedEffect
+        }
         val selection = focusedCatalogSelection.value ?: run {
             lastRequestedTrailerFocusKey = null
             return@LaunchedEffect

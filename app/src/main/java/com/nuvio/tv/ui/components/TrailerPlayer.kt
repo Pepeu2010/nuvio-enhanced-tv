@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -27,6 +28,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.PlaybackException
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MergingMediaSource
@@ -41,6 +43,7 @@ import androidx.media3.ui.PlayerView
 import android.view.LayoutInflater
 import android.view.TextureView
 import com.nuvio.tv.R
+import com.nuvio.tv.ui.theme.LocalUiMotion
 import kotlinx.coroutines.delay
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
@@ -52,7 +55,7 @@ fun TrailerPlayer(
     isPaused: Boolean = false,
     onEnded: () -> Unit,
     onFirstFrameRendered: () -> Unit = {},
-    muted: Boolean = false,
+    muted: Boolean = true,
     seekRequestToken: Int = 0,
     seekDeltaMs: Long = 0L,
     onProgressChanged: (positionMs: Long, durationMs: Long) -> Unit = { _, _ -> },
@@ -61,10 +64,15 @@ fun TrailerPlayer(
     overscanZoom: Float = 1f,
     autoCropLetterbox: Boolean = false,
     modifier: Modifier = Modifier,
-    enter: EnterTransition = fadeIn(animationSpec = tween(800)),
-    exit: ExitTransition = fadeOut(animationSpec = tween(500)),
+    enter: EnterTransition? = null,
+    exit: ExitTransition? = null,
     trailerPlayerPool: TrailerPlayerPool? = null
 ) {
+    val motion = LocalUiMotion.current
+    val enterTransition = if (!motion.allowsSpatialEffects) fadeIn(tween(motion.durationMillis(800)))
+        else enter ?: fadeIn(tween(motion.durationMillis(800)))
+    val exitTransition = if (!motion.allowsSpatialEffects) fadeOut(tween(motion.durationMillis(500)))
+        else exit ?: fadeOut(tween(motion.durationMillis(500)))
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val activityLifecycleOwner = remember(context) { context as? androidx.lifecycle.LifecycleOwner ?: lifecycleOwner }
@@ -76,17 +84,17 @@ fun TrailerPlayer(
     val currentOnProgressChanged by rememberUpdatedState(onProgressChanged)
     val currentOnRemoteKey by rememberUpdatedState(onRemoteKey)
     val zoomScale = if (cropToFill) overscanZoom.coerceAtLeast(1f) else 1f
-    var hasRenderedFirstFrame by remember(trailerUrl) { mutableStateOf(false) }
+    var hasRenderedFirstFrame by remember(trailerUrl, trailerAudioUrl) { mutableStateOf(false) }
     val playerAlphaState = animateFloatAsState(
         targetValue = if (isPlaying && hasRenderedFirstFrame) 1f else 0f,
-        animationSpec = tween(durationMillis = 300),
+        animationSpec = tween(durationMillis = motion.durationMillis(300)),
         label = "trailerFirstFrameAlpha"
     )
     val playerViewRef = remember { mutableStateOf<PlayerView?>(null) }
     var letterboxZoom by remember(trailerUrl) { mutableFloatStateOf(1f) }
     val letterboxZoomState = animateFloatAsState(
         targetValue = if (autoCropLetterbox) letterboxZoom else 1f,
-        animationSpec = tween(durationMillis = 400),
+        animationSpec = tween(durationMillis = motion.durationMillis(400)),
         label = "trailerLetterboxZoom"
     )
 
@@ -96,11 +104,27 @@ fun TrailerPlayer(
     // Use the shared pool instance instead of creating a new ExoPlayer per focus.
     // The pool keeps one ExoPlayer alive across poster focus changes, eliminating
     // the expensive create/teardown cycle that was the app-launch bottleneck.
-    val trailerPlayer = remember(trailerUrl, resolvedPool) {
-        if (trailerUrl != null) {
-            resolvedPool?.acquire()
-        } else {
+    val ownerToken = remember(resolvedPool) { Any() }
+    val activeOwner = resolvedPool?.activeOwner?.collectAsState()?.value
+    val poolGeneration = resolvedPool?.availabilityGeneration?.collectAsState()?.value
+    var acquiredPlayer by remember(resolvedPool) { mutableStateOf<ExoPlayer?>(null) }
+    LaunchedEffect(resolvedPool, poolGeneration, ownerToken, trailerUrl, isPlaying) {
+        acquiredPlayer = if (isPlaying && trailerUrl != null) resolvedPool?.acquire(ownerToken) else {
+            resolvedPool?.stop(ownerToken)
             null
+        }
+    }
+    DisposableEffect(resolvedPool, ownerToken) {
+        onDispose { resolvedPool?.stop(ownerToken) }
+    }
+    val trailerPlayer = acquiredPlayer.takeIf { activeOwner === ownerToken && isPlaying }
+
+    LaunchedEffect(trailerPlayer, trailerUrl, trailerAudioUrl) {
+        if (trailerPlayer == null) return@LaunchedEffect
+        delay(12_000)
+        if (!hasRenderedFirstFrame && resolvedPool?.isOwner(ownerToken) == true) {
+            currentOnEnded()
+            resolvedPool.stop(ownerToken)
         }
     }
 
@@ -115,7 +139,7 @@ fun TrailerPlayer(
         }
     }
 
-    LaunchedEffect(isPlaying, trailerUrl, trailerAudioUrl, muted, trailerPlayer) {
+    LaunchedEffect(isPlaying, trailerUrl, trailerAudioUrl, trailerPlayer) {
         val player = trailerPlayer ?: return@LaunchedEffect
         player.volume = if (muted) 0f else 1f
         if (isPlaying && trailerUrl != null) {
@@ -135,7 +159,7 @@ fun TrailerPlayer(
             player.playWhenReady = false
             // Defer heavy stop and clear until focus settling/collapse has finished
             delay(150)
-            if (!isPlaying) {
+            if (!isPlaying && resolvedPool?.isOwner(ownerToken) == true) {
                 player.stop()
                 player.clearMediaItems()
             }
@@ -202,17 +226,23 @@ fun TrailerPlayer(
         val player = trailerPlayer ?: return@DisposableEffect onDispose {}
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_ENDED) {
+                if (playbackState == Player.STATE_ENDED && resolvedPool?.isOwner(ownerToken) == true) {
                     currentOnEnded()
                 }
             }
 
             override fun onRenderedFirstFrame() {
+                if (resolvedPool?.isOwner(ownerToken) != true) return
                 hasRenderedFirstFrame = true
                 currentOnFirstFrameRendered()
             }
+
+            override fun onPlayerError(error: PlaybackException) {
+                if (resolvedPool?.isOwner(ownerToken) == true) currentOnEnded()
+            }
         }
         val observer = LifecycleEventObserver { _, event ->
+            if (resolvedPool?.isOwner(ownerToken) != true) return@LifecycleEventObserver
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
                     if (currentIsPlaying && !currentTrailerUrl.isNullOrBlank()) {
@@ -247,15 +277,15 @@ fun TrailerPlayer(
             runCatching { activityLifecycleOwner.lifecycle.removeObserver(observer) }
             runCatching { player.removeListener(listener) }
             // Only stop — never release. The pool manages the ExoPlayer lifecycle.
-            resolvedPool?.stop()
+            resolvedPool?.stop(ownerToken)
         }
     }
 
     if (trailerPlayer != null) {
         AnimatedVisibility(
             visible = isPlaying,
-            enter = enter,
-            exit = exit
+            enter = enterTransition,
+            exit = exitTransition
         ) {
             AndroidView(
                 factory = { ctx ->
@@ -287,7 +317,7 @@ fun TrailerPlayer(
                     }
                 },
                 onRelease = { view ->
-                    playerViewRef.value = null
+                    if (playerViewRef.value === view) playerViewRef.value = null
                     view.player = null
                     view.keepScreenOn = false
                 },
