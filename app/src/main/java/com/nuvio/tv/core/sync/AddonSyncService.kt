@@ -3,6 +3,8 @@ package com.nuvio.tv.core.sync
 import android.util.Log
 import com.nuvio.tv.core.auth.AuthManager
 import com.nuvio.tv.core.profile.ProfileManager
+import com.nuvio.tv.domain.model.AuthState
+import kotlinx.coroutines.CancellationException
 import com.nuvio.tv.data.local.AddonPreferences
 import com.nuvio.tv.data.remote.supabase.SupabaseAddon
 import io.github.jan.supabase.postgrest.Postgrest
@@ -88,6 +90,11 @@ class AddonSyncService @Inject constructor(
 
     suspend fun getRemoteAddonUrls(): Result<List<String>> = withContext(Dispatchers.IO) {
         try {
+            val account = (authManager.authState.value as? AuthState.FullAccount)?.userId
+                ?: return@withContext Result.failure(IllegalStateException("Addon sync requires an account"))
+            val activeProfileId = profileManager.activeProfileId.value
+            fun stillCurrent() = (authManager.authState.value as? AuthState.FullAccount)?.userId == account &&
+                profileManager.activeProfileId.value == activeProfileId
             val effectiveUserId = authManager.getEffectiveUserId(fallbackToOwnIdOnFailure = false)
                 ?: return@withContext Result.failure(
                     IllegalStateException("Unable to resolve sync owner for addon sync")
@@ -116,9 +123,9 @@ class AddonSyncService @Inject constructor(
                 enabledMap[canonicalUrl] = addon.enabled
             }
             if (remoteAddons.isNotEmpty()) {
-                addonPreferences.setUserSetNames(nameMap)
-                addonPreferences.setAddonEnabledStates(enabledMap)
+                addonPreferences.applyRemoteMetadata(profileId, nameMap, enabledMap, ::stillCurrent)
             }
+            if (!stillCurrent()) throw CancellationException("Addon sync owner changed")
 
             Result.success(
                 remoteAddons
@@ -126,6 +133,7 @@ class AddonSyncService @Inject constructor(
                 .map { it.url }
             )
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             Log.e(TAG, "Failed to get remote addon URLs", e)
             Result.failure(e)
         }

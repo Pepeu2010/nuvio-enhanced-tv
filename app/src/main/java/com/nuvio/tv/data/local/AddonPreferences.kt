@@ -213,6 +213,15 @@ class AddonPreferences @Inject constructor(
         }
     }
 
+    internal suspend fun applyRemoteMetadata(profileId: Int, names: Map<String, String>,
+        enabledStates: Map<String, Boolean>, stillCurrent: () -> Boolean) {
+        store(profileId).edit { preferences ->
+            if (!stillCurrent()) throw kotlinx.coroutines.CancellationException("Addon sync owner changed")
+            preferences[userSetNamesKey] = gson.toJson(names.mapKeys { (url, _) -> canonicalizeUrl(url) })
+            preferences[addonEnabledStatesKey] = gson.toJson(enabledStates.mapKeys { (url, _) -> canonicalizeUrl(url) })
+        }
+    }
+
     private fun parseNameMap(json: String): Map<String, String> {
         return try {
             val type = object : TypeToken<Map<String, String>>() {}.type

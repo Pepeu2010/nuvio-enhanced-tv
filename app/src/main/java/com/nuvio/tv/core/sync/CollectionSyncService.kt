@@ -3,6 +3,8 @@ package com.nuvio.tv.core.sync
 import android.util.Log
 import com.nuvio.tv.core.auth.AuthManager
 import com.nuvio.tv.core.profile.ProfileManager
+import com.nuvio.tv.domain.model.AuthState
+import kotlinx.coroutines.CancellationException
 import com.nuvio.tv.data.local.CollectionsDataStore
 import com.nuvio.tv.data.remote.supabase.SupabaseCollectionBlob
 import io.github.jan.supabase.postgrest.Postgrest
@@ -52,8 +54,12 @@ class CollectionSyncService @Inject constructor(
      */
     suspend fun pushToRemote(): Result<Unit> = withContext(Dispatchers.IO) {
         try {
+            val account = (authManager.authState.value as? AuthState.FullAccount)?.userId
+                ?: return@withContext Result.failure(IllegalStateException("Collections require an account"))
             val profileId = profileManager.activeProfileId.value
             val json = collectionsDataStore.exportCurrentProfileJson()
+            if ((authManager.authState.value as? AuthState.FullAccount)?.userId != account ||
+                profileManager.activeProfileId.value != profileId) throw CancellationException("Collection sync owner changed")
 
             val collectionsJsonElement = if (json.isNullOrBlank()) {
                 JsonArray(emptyList())
@@ -74,6 +80,7 @@ class CollectionSyncService @Inject constructor(
             Log.d(TAG, "Pushed collections to remote for profile $profileId")
             Result.success(Unit)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             Log.e(TAG, "Failed to push collections to remote", e)
             Result.failure(e)
         }
@@ -85,7 +92,11 @@ class CollectionSyncService @Inject constructor(
      */
     suspend fun pullFromRemote(): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
+            val account = (authManager.authState.value as? AuthState.FullAccount)?.userId
+                ?: return@withContext Result.failure(IllegalStateException("Collections require an account"))
             val profileId = profileManager.activeProfileId.value
+            fun stillCurrent() = (authManager.authState.value as? AuthState.FullAccount)?.userId == account &&
+                profileManager.activeProfileId.value == profileId
 
             val params = buildJsonObject {
                 put("p_profile_id", profileId)
@@ -95,6 +106,7 @@ class CollectionSyncService @Inject constructor(
                 postgrest.rpc("sync_pull_collections", params)
             }
             val rows = response.decodeList<SupabaseCollectionBlob>()
+            if (!stillCurrent()) throw CancellationException("Collection sync owner changed")
             val blob = rows.firstOrNull()
             if (blob == null) {
                 Log.d(TAG, "No remote collections for profile $profileId; keeping local")
@@ -120,7 +132,7 @@ class CollectionSyncService @Inject constructor(
 
             isSyncingFromRemote = true
             try {
-                collectionsDataStore.setCollections(remoteCollections)
+                collectionsDataStore.applySyncedCollections(profileId, remoteCollections, ::stillCurrent)
             } finally {
                 isSyncingFromRemote = false
             }
@@ -128,6 +140,7 @@ class CollectionSyncService @Inject constructor(
             Log.d(TAG, "Applied ${remoteCollections.size} remote collections for profile $profileId")
             Result.success(true)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             Log.e(TAG, "Failed to pull collections from remote", e)
             Result.failure(e)
         }
@@ -139,9 +152,13 @@ class CollectionSyncService @Inject constructor(
     fun triggerPush() {
         if (isSyncingFromRemote) return
         if (!authManager.isAuthenticated) return
+        val account = (authManager.authState.value as? AuthState.FullAccount)?.userId ?: return
+        val profileId = profileManager.activeProfileId.value
         pushJob?.cancel()
         pushJob = scope.launch {
             delay(500)
+            if ((authManager.authState.value as? AuthState.FullAccount)?.userId != account ||
+                profileManager.activeProfileId.value != profileId) return@launch
             pushToRemote()
         }
     }

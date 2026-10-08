@@ -27,13 +27,14 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import javax.inject.Inject
 import javax.inject.Singleton
+import java.util.concurrent.atomic.AtomicBoolean
 
 private const val TAG = "StartupSyncService"
 private const val FORCE_RESYNC_MIN_INTERVAL_MS = 30_000L
 private const val FULL_STARTUP_PULL_TTL_MS = 6 * 60 * 60 * 1000L
 private const val FOREGROUND_ACTIVITY_PULL_DELAY_MS = 2_500L
 private const val FOREGROUND_ACTIVITY_PULL_MIN_INTERVAL_MS = 2 * 60_000L
-private const val PERIODIC_SURFACE_PULL_INTERVAL_MS = 15 * 60_000L
+private const val PERIODIC_SURFACE_PULL_INTERVAL_MS = 2 * 60_000L
 
 internal data class SurfacePullFreshness(
     val key: String? = null,
@@ -287,12 +288,18 @@ class StartupSyncService @Inject constructor(
             if (pullKey(currentState.userId) != key || startupPullJob?.isActive == true) return@launch
             val profileId = profileManager.activeProfileId.value
             Log.d(TAG, "Activity sync started profile=$profileId reason=$reason")
-            val succeeded = coroutineScope {
-                val watchState = async { pullPeriodicWatchState() }
-                val library = async { pullPeriodicLibrary() }
-                watchState.await() && library.await()
+            // Refresh setup first: it determines the active tracking source and addons.
+            val broadSucceeded = try {
+                pullBroadRemoteData(profileId, includeProfileSettings = true)
+            } catch (e: CancellationException) { throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Account surfaces pull incomplete: ${e::class.simpleName}")
+                false
             }
-            if (succeeded) {
+            if (pullKey((authManager.authState.value as? AuthState.FullAccount)?.userId ?: "") != key) return@launch
+            val watchSucceeded = pullPeriodicWatchState()
+            val succeeded = broadSucceeded && watchSucceeded
+            if (succeeded && pullKey((authManager.authState.value as? AuthState.FullAccount)?.userId ?: "") == key) {
                 activityPullFreshness = SurfacePullFreshness(
                     key = key,
                     pulledAtMs = SystemClock.elapsedRealtime()
@@ -449,7 +456,8 @@ class StartupSyncService @Inject constructor(
             }
 
             Log.d(TAG, "Pulling remote data for profile $profileId")
-            pullBroadRemoteData(profileId, includeProfileSettings)
+            val broadSucceeded = pullBroadRemoteData(profileId, includeProfileSettings)
+            var watchSucceeded = true
 
             val shouldUseSupabaseWatchProgressSync = watchProgressSyncService.shouldUseSupabaseWatchProgressSync(profileId)
             Log.d(
@@ -457,18 +465,20 @@ class StartupSyncService @Inject constructor(
                 "Watch progress sync: shouldUseSupabaseWatchProgressSync=$shouldUseSupabaseWatchProgressSync"
             )
             if (shouldUseSupabaseWatchProgressSync) {
-                pullWatchedItemsSnapshot(profileId)
-                syncWatchProgressSnapshot(
+                val watchedSucceeded = pullWatchedItemsSnapshot(profileId)
+                val progressSucceeded = syncWatchProgressSnapshot(
                     profileId = profileId,
                     pushUnsynced = true,
                     failureMessage = "Failed to sync watch progress, continuing"
-                )
+                ).isSuccess
+                watchSucceeded = watchedSucceeded && progressSucceeded
             } else {
                 libraryRepository.hasCompletedInitialPull = true
                 watchProgressRepository.hasCompletedInitialPull = true
                 watchProgressRepository.hasCompletedInitialWatchedItemsPull = true
                 Log.d(TAG, "Skipping Supabase watched items and watch progress for profile $profileId because a tracking provider is active")
             }
+            check(broadSucceeded && watchSucceeded) { "Account synchronization incomplete" }
             startupSyncPreferences.markFullPull(
                 profileId = profileId,
                 userId = userId,
@@ -476,6 +486,7 @@ class StartupSyncService @Inject constructor(
             )
             return Result.success(Unit)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             pluginManager.isSyncingFromRemote = false
             addonRepository.isSyncingFromRemote = false
             watchProgressRepository.isSyncingFromRemote = false
@@ -492,24 +503,27 @@ class StartupSyncService @Inject constructor(
     ): Result<Unit> {
         try {
             Log.d(TAG, "Running warm remote sync for profile $profileId")
-            pullBroadRemoteData(profileId, includeProfileSettings)
+            val broadSucceeded = pullBroadRemoteData(profileId, includeProfileSettings)
+            var watchSucceeded = true
             val shouldUseSupabaseWatchProgressSync = watchProgressSyncService.shouldUseSupabaseWatchProgressSync(profileId)
             Log.d(
                 TAG,
                 "Warm watch progress sync: shouldUseSupabaseWatchProgressSync=$shouldUseSupabaseWatchProgressSync"
             )
             if (shouldUseSupabaseWatchProgressSync) {
-                pullWatchedItemsDelta(profileId)
-                syncWatchProgressDelta(
+                val watchedSucceeded = pullWatchedItemsDelta(profileId)
+                val progressSucceeded = syncWatchProgressDelta(
                     profileId = profileId,
                     pushUnsynced = true,
                     failureMessage = "Failed to sync warm watch progress, continuing"
-                )
+                ).isSuccess
+                watchSucceeded = watchedSucceeded && progressSucceeded
             } else {
                 watchProgressRepository.hasCompletedInitialPull = true
                 watchProgressRepository.hasCompletedInitialWatchedItemsPull = true
                 Log.d(TAG, "Skipping warm Supabase watch progress sync for profile $profileId because a tracking provider is active")
             }
+            check(broadSucceeded && watchSucceeded) { "Account synchronization incomplete" }
             startupSyncPreferences.markFullPull(
                 profileId = profileId,
                 userId = userId,
@@ -517,6 +531,7 @@ class StartupSyncService @Inject constructor(
             )
             return Result.success(Unit)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             watchProgressRepository.isSyncingFromRemote = false
             libraryRepository.isSyncingFromRemote = false
             Log.e(TAG, "Warm startup sync failed", e)
@@ -524,11 +539,20 @@ class StartupSyncService @Inject constructor(
         }
     }
 
-    private suspend fun pullBroadRemoteData(
+    internal suspend fun pullBroadRemoteData(
         profileId: Int,
         includeProfileSettings: Boolean
-    ) {
+    ): Boolean {
+        val failed = AtomicBoolean(false)
+        val userId = (authManager.authState.value as? AuthState.FullAccount)?.userId
+            ?: throw CancellationException("Account sync signed out")
+        fun requireCurrentOwner() {
+            if ((authManager.authState.value as? AuthState.FullAccount)?.userId != userId ||
+                profileManager.activeProfileId.value != profileId) throw CancellationException("Account sync owner changed")
+        }
+        requireCurrentOwner()
         profileSyncService.pullFromRemote().getOrElse { throw it }
+        requireCurrentOwner()
         Log.d(TAG, "Pulled profiles from remote")
 
         if (includeProfileSettings) {
@@ -537,6 +561,8 @@ class StartupSyncService @Inject constructor(
                     Log.d(TAG, "Profile settings blob pull completed for profile $profileId (applied=$applied)")
                 }
                 .onFailure { e ->
+                    if (e is CancellationException) throw e
+                    failed.set(true)
                     Log.e(TAG, "Failed to pull profile settings blob, keeping local settings", e)
                 }
         }
@@ -546,8 +572,11 @@ class StartupSyncService @Inject constructor(
                 Log.d(TAG, "Provider credential sync completed for profile $profileId applied=$applied")
             }
             .onFailure { error ->
+                if (error is CancellationException) throw error
+                failed.set(true)
                 Log.e(TAG, "Failed to sync provider credentials, keeping local credentials", error)
             }
+        requireCurrentOwner()
 
         coroutineScope {
             val libraryJob = async {
@@ -556,6 +585,7 @@ class StartupSyncService @Inject constructor(
                     libraryRepository.isSyncingFromRemote = true
                     try {
                         val result = librarySyncService.syncFromRemote(profileId).getOrElse { throw it }
+                        requireCurrentOwner()
                         libraryRepository.hasCompletedInitialPull = true
                         Log.d(
                             TAG,
@@ -563,6 +593,8 @@ class StartupSyncService @Inject constructor(
                                 "upserts=${result.appliedUpserts} deletes=${result.appliedDeletes}"
                         )
                     } catch (e: Exception) {
+                        if (e is CancellationException) throw e
+                        failed.set(true)
                         Log.e(TAG, "Failed to pull library, continuing with other syncs", e)
                         libraryRepository.hasCompletedInitialPull = true
                     } finally {
@@ -577,12 +609,15 @@ class StartupSyncService @Inject constructor(
                 pluginManager.isSyncingFromRemote = true
                 try {
                     val remotePlugins = pluginSyncService.getRemoteRepoUrls().getOrElse { throw it }
+                    requireCurrentOwner()
                     pluginManager.reconcileWithRemoteRepoUrls(
                         remotePlugins = remotePlugins,
                         removeMissingLocal = true
                     )
                     Log.d(TAG, "Pulled ${remotePlugins.size} plugin repos from remote for profile $profileId")
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    failed.set(true)
                     Log.e(TAG, "Failed to pull plugins from remote, keeping local cache", e)
                 } finally {
                     pluginManager.isSyncingFromRemote = false
@@ -594,12 +629,15 @@ class StartupSyncService @Inject constructor(
                 addonRepository.isSyncingFromRemote = true
                 try {
                     val remoteAddonUrls = addonSyncService.getRemoteAddonUrls().getOrElse { throw it }
+                    requireCurrentOwner()
                     addonRepository.reconcileWithRemoteAddonUrls(
                         remoteUrls = remoteAddonUrls,
                         removeMissingLocal = true
                     )
                     Log.d(TAG, "Pulled ${remoteAddonUrls.size} addons from remote for profile $profileId")
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    failed.set(true)
                     Log.e(TAG, "Failed to pull addons from remote, keeping local cache", e)
                 } finally {
                     addonRepository.isSyncingFromRemote = false
@@ -613,9 +651,13 @@ class StartupSyncService @Inject constructor(
                             Log.d(TAG, "Collections pull completed for profile $profileId (applied=$applied)")
                         }
                         .onFailure { e ->
+                            if (e is CancellationException) throw e
+                            failed.set(true)
                             Log.e(TAG, "Failed to pull collections from remote, keeping local", e)
                         }
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    failed.set(true)
                     Log.e(TAG, "Failed to pull collections from remote", e)
                 }
             }
@@ -627,9 +669,13 @@ class StartupSyncService @Inject constructor(
                             Log.d(TAG, "Home catalog settings pull completed for profile $profileId (applied=$applied)")
                         }
                         .onFailure { e ->
+                            if (e is CancellationException) throw e
+                            failed.set(true)
                             Log.e(TAG, "Failed to pull home catalog settings from remote, keeping local", e)
                         }
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    failed.set(true)
                     Log.e(TAG, "Failed to pull home catalog settings from remote", e)
                 }
             }
@@ -640,6 +686,8 @@ class StartupSyncService @Inject constructor(
             homeCatalogJob.await()
             libraryJob.await()
         }
+        requireCurrentOwner()
+        return !failed.get()
     }
 
     private suspend fun pullNuvioLibrary(profileId: Int): Boolean {
@@ -725,7 +773,7 @@ class StartupSyncService @Inject constructor(
         }
     }
 
-    private suspend fun pullWatchedItemsSnapshot(profileId: Int) {
+    private suspend fun pullWatchedItemsSnapshot(profileId: Int): Boolean {
         try {
             Log.d(TAG, "Starting watched items snapshot sync for profile $profileId")
             val watchedItemsResult = watchedItemsSyncService.syncSnapshotFromRemote(profileId).getOrElse { throw it }
@@ -738,8 +786,11 @@ class StartupSyncService @Inject constructor(
                 Log.d(TAG, "Detected unsynced watched items after snapshot, pushing to remote")
                 watchedItemsSyncService.pushToRemote(profileId)
             }
+            return true
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             Log.e(TAG, "Failed to pull watched items snapshot, continuing with other syncs", e)
+            return false
         }
     }
 

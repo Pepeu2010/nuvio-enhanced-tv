@@ -72,6 +72,13 @@ class CollectionsDataStore @Inject constructor(
         }
     }
 
+    internal suspend fun applySyncedCollections(profileId: Int, collections: List<Collection>, stillCurrent: () -> Boolean) {
+        store(profileId).edit { prefs ->
+            if (!stillCurrent()) throw kotlinx.coroutines.CancellationException("Collection sync owner changed")
+            prefs[collectionsKey] = gson.toJson(collections.map { it.toSerializable() })
+        }
+    }
+
     suspend fun addCollection(collection: Collection) {
         store().edit { prefs ->
             val current = parseCollections(prefs[collectionsKey]).toMutableList()

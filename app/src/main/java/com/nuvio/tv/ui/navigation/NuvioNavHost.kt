@@ -14,6 +14,7 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
@@ -76,7 +77,15 @@ private fun PlaybackNavHost(
     hideBuiltInHeaders: Boolean
 ) {
     val playbackAvailability = LocalPlaybackAvailability.current
-    val navigationDuration = LocalUiMotion.current.durationMillis(NuvioMotion.tokens.durations.medium)
+    val motion = LocalUiMotion.current
+    val navigationDuration = motion.durationMillis(NuvioMotion.tokens.durations.medium)
+    fun spatialEntrance(from: String, to: String, backwards: Boolean = false): EnterTransition {
+        val fade = fadeIn(tween(navigationDuration))
+        if (!motion.allowsSpatialEffects || from.startsWith("player/") || to.startsWith("player/")) return fade
+        return fade + slideInVertically(tween(navigationDuration, easing = NuvioMotion.tokens.easings.emphasized)) {
+            if (backwards) -it / 64 else it / 64
+        }
+    }
     val context = LocalContext.current
     fun isStreamToPlayer(from: String, to: String): Boolean {
         return from.startsWith("stream/") && to.startsWith("player/")
@@ -98,7 +107,7 @@ private fun PlaybackNavHost(
             if (isStreamToPlayer(from, to) && isAutoPlayNav) {
                 EnterTransition.None
             } else {
-                fadeIn(animationSpec = tween(navigationDuration))
+                spatialEntrance(from, to)
             }
         },
         exitTransition = {
@@ -122,7 +131,7 @@ private fun PlaybackNavHost(
             if (isPlayerToStream(from, to) && isAutoPlayNav) {
                 EnterTransition.None
             } else {
-                fadeIn(animationSpec = tween(navigationDuration))
+                spatialEntrance(from, to, backwards = true)
             }
         },
         popExitTransition = {

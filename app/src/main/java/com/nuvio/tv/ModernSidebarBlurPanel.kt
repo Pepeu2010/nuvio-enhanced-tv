@@ -40,6 +40,8 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Card
@@ -96,7 +98,7 @@ internal fun ModernSidebarBlurPanel(
         LocalConfiguration.current.screenHeightDp >= 420
     val delayedBlurProgress =
         ((sidebarExpandProgress - 0.34f) / 0.66f).coerceIn(0f, 1f)
-    val showPanelBlur = blurEnabled &&
+    val showPanelBlur = blurEnabled && motionPolicy.allowsSpatialEffects &&
         isSidebarExpanded &&
         !sidebarCollapsePending &&
         delayedBlurProgress > 0f
@@ -122,7 +124,7 @@ internal fun ModernSidebarBlurPanel(
             else -> 0.97f
         }
         Brush.verticalGradient(listOf(
-            baseColor.copy(alpha = alpha),
+            bgCard.copy(alpha = alpha),
             baseColor.copy(alpha = alpha)
         ))
     }
@@ -254,12 +256,11 @@ private fun SidebarNavigationItem(
     val motionTokens = NuvioMotion.tokensFor(motionPolicy)
     var isFocused by remember { mutableStateOf(false) }
     val colors = NuvioTheme.colors
-    val shape = RoundedCornerShape(NuvioRadii.tokens.full)
+    val shape = RoundedCornerShape(14.dp)
     val palette = NuvioTheme.palette
     val accentColor = palette.secondary
     val backgroundColorTarget = when {
-        isFocused && selected -> accentColor.copy(alpha = 0.28f)
-        isFocused -> Color.White.copy(alpha = 0.12f)
+        isFocused -> colors.TextPrimary
         selected -> accentColor.copy(alpha = 0.15f)
         else -> Color.Transparent
     }
@@ -271,8 +272,8 @@ private fun SidebarNavigationItem(
     val backgroundColor = if (selected && !isFocused) backgroundColorTarget else animatedBackgroundColor
 
     val contentColorTarget = when {
+        isFocused -> colors.TextInverse
         selected -> accentColor
-        isFocused -> colors.TextPrimary
         else -> colors.text.onOverlay
     }
     val animatedContentColor by animateColorAsState(
@@ -282,10 +283,10 @@ private fun SidebarNavigationItem(
     )
     val contentColor = if (selected && !isFocused) contentColorTarget else animatedContentColor
 
-    val iconBrush = if (selected) palette.accentBrush() else null
+    val iconBrush = if (selected && !isFocused) palette.accentBrush() else null
     val iconTintTarget = when {
+        isFocused -> colors.TextInverse
         selected -> Color.White
-        isFocused -> colors.TextPrimary
         else -> colors.text.onOverlay
     }
     val animatedIconTint by animateColorAsState(
@@ -295,7 +296,7 @@ private fun SidebarNavigationItem(
     )
     val iconTint = if (selected && !isFocused) iconTintTarget else animatedIconTint
     val itemScale by animateFloatAsState(
-        targetValue = if (isFocused) motionPolicy.scale(1.04f) else 1f,
+        targetValue = if (isFocused) motionTokens.focusScale else 1f,
         animationSpec = tween(durationMillis = motionTokens.durations.fast, easing = motionTokens.easings.standard),
         label = "sidebarItemScale"
     )
@@ -303,6 +304,7 @@ private fun SidebarNavigationItem(
     Card(
         onClick = onClick,
         modifier = modifier
+            .semantics { this.selected = selected }
             .graphicsLayer {
                 scaleX = itemScale
                 scaleY = itemScale
@@ -320,7 +322,7 @@ private fun SidebarNavigationItem(
         border = CardDefaults.border(
             border = androidx.tv.material3.Border.None,
             focusedBorder = androidx.tv.material3.Border(
-                border = androidx.compose.foundation.BorderStroke(NuvioStrokes.tokens.thin, Color.Transparent),
+                border = androidx.compose.foundation.BorderStroke(NuvioStrokes.tokens.thin, colors.FocusRing),
                 shape = shape
             )
         ),
