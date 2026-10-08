@@ -139,7 +139,7 @@ class HomeTrailerPreviewLifecycleTest {
         repeat(64) { vm.trailerPreviewUrlsState["cached:$it"]="video"; vm.trailerPreviewAudioUrlsState["cached:$it"]="audio" }
         request(vm, "a"); vm.trailerPreviewJob!!.join()
         assertEquals(64, vm.trailerPreviewUrlsState.size); assertEquals(64, vm.trailerPreviewAudioUrlsState.size)
-        assertEquals(vm.trailerPreviewUrlsState.keys, vm.trailerPreviewAudioUrlsState.keys)
+        assertEquals(vm.trailerPreviewUrlsState.keys.toSet(), vm.trailerPreviewAudioUrlsState.keys.toSet())
         assertEquals("https://fixture.test/latest.mp4", vm.trailerPreviewUrlsState["a"])
     }
 
@@ -147,6 +147,19 @@ class HomeTrailerPreviewLifecycleTest {
         val vm = newViewModel(service()); repeat(64) { vm.trailerPreviewNegativeCache.add("missing:$it") }
         request(vm, "a"); vm.trailerPreviewJob!!.join()
         assertEquals(64, vm.trailerPreviewNegativeCache.size); assertTrue("a" in vm.trailerPreviewNegativeCache)
+    }
+
+    @Test fun fallbackResolutionRunsOnIoAndPreservesTheMatchingAudioSource() = runBlocking {
+        val onIo = AtomicBoolean(); val service = service()
+        coEvery { service.getTrailerPlaybackSourceFromYouTubeUrl(any(), any(), any()) } coAnswers {
+            onIo.set(currentCoroutineContext()[kotlin.coroutines.ContinuationInterceptor] == Dispatchers.IO)
+            TrailerPlaybackSource("https://fixture.test/fallback.mp4", "https://fixture.test/fallback.m4a")
+        }
+        val vm = newViewModel(service); request(vm, "a", fallback="abcdefghijk")
+        withTimeout(3_000) { vm.trailerPreviewJob!!.join() }
+        assertTrue(onIo.get())
+        assertEquals("https://fixture.test/fallback.mp4", vm.trailerPreviewUrlsState["a"])
+        assertEquals("https://fixture.test/fallback.m4a", vm.trailerPreviewAudioUrlsState["a"])
     }
 
     private fun request(vm: HomeViewModel, id: String, fallback: String? = null) =

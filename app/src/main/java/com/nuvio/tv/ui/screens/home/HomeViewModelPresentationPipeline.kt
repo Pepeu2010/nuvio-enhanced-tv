@@ -986,11 +986,16 @@ private fun HomeViewModel.updateCatalogItemWithMeta(itemId: String, meta: Meta) 
 
     // If external meta brought new trailerYtIds and the item has no trailer resolved yet, retry.
     // Only retry if this item is currently focused — avoid prefetching trailers for adjacent items.
-    if (incomingTrailerYtIds.isNotEmpty() && !trailerPreviewUrlsState.containsKey(itemId) && activeTrailerPreviewItemId == itemId) {
-        trailerPreviewNegativeCache.remove(itemId)
-        cancelTrailerPreviewPipeline()
-        val currentItem = findCatalogItemById(itemId) ?: return
-        requestTrailerPreviewPipeline(currentItem)
+    if (incomingTrailerYtIds.isNotEmpty()) {
+        // Enrichment runs on IO. Preview ownership/cache mutations share the UI thread
+        // with focus changes, and the focused item must be checked after dispatching.
+        viewModelScope.launch(Dispatchers.Main.immediate) {
+            if (trailerPreviewUrlsState.containsKey(itemId) || activeTrailerPreviewItemId != itemId) return@launch
+            val currentItem = findCatalogItemById(itemId) ?: return@launch
+            trailerPreviewNegativeCache.remove(itemId)
+            cancelTrailerPreviewPipeline()
+            requestTrailerPreviewPipeline(currentItem)
+        }
     }
 }
 
