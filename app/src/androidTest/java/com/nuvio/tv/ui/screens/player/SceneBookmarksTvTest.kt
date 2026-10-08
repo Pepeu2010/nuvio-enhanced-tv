@@ -31,6 +31,7 @@ class SceneBookmarksTvTest {
     private fun activate(tag: String) {
         compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.RequestFocus) { it() }
         compose.onNodeWithTag(tag).assertIsFocused()
+        instrumentation.waitForIdleSync()
         instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
         compose.waitForIdle()
     }
@@ -52,12 +53,14 @@ class SceneBookmarksTvTest {
         compose.onNodeWithTag("scene-bookmark-name").performTextReplacement("Cena favorita para rever com a família")
         compose.onNodeWithTag("scene-bookmark-name").performImeAction()
         activate("scene-bookmark-save")
+        compose.waitUntil(5_000) { store.load(scope).isNotEmpty() }
         val item=store.load(scope).single()
         assertEquals(32_180L,item.positionMs)
         activate("scene-bookmark-rename-${item.id}")
         compose.onNodeWithTag("scene-bookmark-name").performTextReplacement("Rever depois")
         compose.onNodeWithTag("scene-bookmark-name").performImeAction()
         activate("scene-bookmark-save")
+        compose.waitUntil(5_000) { store.load(scope).single().name == "Rever depois" }
         assertEquals("Rever depois",store.load(scope).single().name)
         activate("scene-bookmark-jump-${item.id}")
         assertEquals(32_180L,jumped)

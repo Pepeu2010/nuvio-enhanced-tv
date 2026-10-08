@@ -52,6 +52,7 @@ internal fun SceneBookmarksDialog(
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         BoxWithConstraints(Modifier.fillMaxSize().padding(24.dp)) {
             val compact = maxHeight < 440.dp
+            CompositionLocalProvider(androidx.tv.material3.LocalContentColor provides NuvioTheme.colors.TextPrimary) {
             Column(Modifier.widthIn(max = 760.dp).fillMaxWidth().heightIn(max = maxHeight)
                 .align(androidx.compose.ui.Alignment.Center)
                 .background(NuvioTheme.colors.Background, RoundedCornerShape(24.dp)).padding(if (compact) 16.dp else 24.dp)
@@ -76,6 +77,8 @@ internal fun SceneBookmarksDialog(
                             unfocusedTextColor = androidx.compose.ui.graphics.Color.White,
                             focusedLabelColor = androidx.compose.ui.graphics.Color.White,
                             unfocusedLabelColor = NuvioTheme.colors.TextSecondary,
+                            focusedContainerColor = NuvioTheme.colors.Background,
+                            unfocusedContainerColor = NuvioTheme.colors.Background,
                             cursorColor = androidx.compose.ui.graphics.Color.White),
                         enabled = writable, modifier = Modifier.weight(1f).testTag("scene-bookmark-name"))
                     Button(onClick = {
@@ -123,6 +126,7 @@ internal fun SceneBookmarksDialog(
                         Text(stringResource(R.string.scene_bookmarks_close))
                     }
                 }
+            }
             }
             LaunchedEffect(writable, canSave) {
                 if (writable && canSave) first.requestFocusAfterFrames() else close.requestFocusAfterFrames()
