@@ -102,15 +102,19 @@ fun HomeScreen(
     // Home was the only major screen without a lifecycle observer, so nothing ever told it to
     // look at its catalogs again.
     val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 viewModel.beginShuffleHomeVisit()
                 viewModel.refreshHomeCatalogsIfStale()
             }
+            if (event == Lifecycle.Event.ON_STOP) viewModel.cancelTrailerPreview()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        onDispose {
+            viewModel.cancelTrailerPreview()
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
     val modernPresentation by viewModel.modernHomePresentation.collectAsStateWithLifecycle()
     val initialCwResolved by viewModel.initialCwResolved.collectAsStateWithLifecycle()
@@ -559,6 +563,7 @@ private fun ClassicHomeRoute(
         onRequestTrailerPreview = { item ->
             viewModel.requestTrailerPreview(item)
         },
+        onCancelTrailerPreview = { viewModel.cancelTrailerPreview() },
         onItemFocus = { item ->
             viewModel.onItemFocus(item)
         },
@@ -692,6 +697,7 @@ private fun ModernHomeRoute(
         onContinueWatchingPlayManually = onContinueWatchingPlayManually,
         showContinueWatchingManualPlayOption = showContinueWatchingManualPlayOption,
         onRequestTrailerPreview = requestTrailerPreview,
+        onCancelTrailerPreview = { viewModel.cancelTrailerPreview() },
         onLoadMoreCatalog = loadMoreCatalog,
         onRemoveContinueWatching = removeContinueWatching,
         isCatalogItemWatched = isCatalogItemWatched,

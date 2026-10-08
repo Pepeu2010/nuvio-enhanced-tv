@@ -109,7 +109,8 @@ fun ClassicHomeContent(
     onSaveFocusState: (Int, Int, String?, Map<String, String>, Map<String, Int>, Map<String, String>, Int, Int) -> Unit,
     onFocusedRowKeyChanged: (String?) -> Unit = {},
     scrollToTopTrigger: Int = 0,
-    onRequestLazyCatalogLoad: (String) -> Unit = {}
+    onRequestLazyCatalogLoad: (String) -> Unit = {},
+    onCancelTrailerPreview: () -> Unit = {}
 ) {
     val defaultBringIntoViewSpec = LocalBringIntoViewSpec.current
     val density = LocalDensity.current
@@ -367,18 +368,10 @@ fun ClassicHomeContent(
     val savedHeroIndex = rememberSaveable { mutableIntStateOf(0) }
     val latestOnItemFocus by rememberUpdatedState(onItemFocus)
     val latestOnRequestTrailerPreview by rememberUpdatedState(onRequestTrailerPreview)
+    val latestOnCancelTrailerPreview by rememberUpdatedState(onCancelTrailerPreview)
 
     // Track focused catalog item for trailer preview requests (mirrors ModernHomeContent behavior).
     var focusedCatalogItem by remember { mutableStateOf<MetaPreview?>(null) }
-    if (uiState.focusedPosterBackdropTrailerEnabled) {
-        LaunchedEffect(focusedCatalogItem) {
-            val item = focusedCatalogItem ?: return@LaunchedEffect
-            if (trailerPreviewUrls.containsKey(item.id)) return@LaunchedEffect
-            delay(150)
-            if (focusedCatalogItem?.id != item.id) return@LaunchedEffect
-            latestOnRequestTrailerPreview(item)
-        }
-    }
 
     val handleMetaFocus: (MetaPreview) -> Unit = remember(uiState.classicFocusGradientEnabled, uiState.focusedPosterBackdropExpandEnabled, uiState.focusedPosterBackdropTrailerEnabled, globalLandscape) {
         { item ->
@@ -460,6 +453,13 @@ fun ClassicHomeContent(
 
     val isVerticalScrollingState = remember(columnListState) {
         derivedStateOf { columnListState.isScrollInProgress }
+    }
+    LaunchedEffect(focusedCatalogItem, uiState.focusedPosterBackdropTrailerEnabled, isVerticalScrollingState.value) {
+        latestOnCancelTrailerPreview()
+        if (!uiState.focusedPosterBackdropTrailerEnabled || isVerticalScrollingState.value) return@LaunchedEffect
+        val item = focusedCatalogItem ?: return@LaunchedEffect
+        delay(150)
+        if (focusedCatalogItem?.id == item.id) latestOnRequestTrailerPreview(item)
     }
     val immersiveFadeDistancePx = remember(density) {
         with(density) { CLASSIC_IMMERSIVE_FADE_DISTANCE.toPx() }

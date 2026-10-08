@@ -141,7 +141,8 @@ fun ModernHomeContent(
     scrollToTopTrigger: Int = 0,
     onRequestLazyCatalogLoad: (String) -> Unit = {},
     onRowItemFocusedCallback: (String, Int, Boolean) -> Unit = { _, _, _ -> },
-    blockLeftOnFirstExpandedItem: Boolean = false
+    blockLeftOnFirstExpandedItem: Boolean = false,
+    onCancelTrailerPreview: () -> Unit = {}
 ) {
     val onRowItemFocusedPassedDown = rememberUpdatedState(onRowItemFocusedCallback)
     val defaultBringIntoViewSpec = LocalBringIntoViewSpec.current
@@ -345,6 +346,7 @@ fun ModernHomeContent(
         effectiveAutoplayEnabled,
         verticalRowListState.isScrollInProgress
     ) {
+        onCancelTrailerPreview()
         if (!effectiveAutoplayEnabled) {
             lastRequestedTrailerFocusKey = null
             return@LaunchedEffect

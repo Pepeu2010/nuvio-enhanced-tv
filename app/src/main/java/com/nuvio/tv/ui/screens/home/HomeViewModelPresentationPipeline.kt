@@ -31,8 +31,19 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 private const val TMDB_HERO_ENRICHMENT_CONCURRENCY = 4
+internal const val HOME_TRAILER_PREVIEW_TIMEOUT_MS = 6_000L
+private const val HOME_TRAILER_PREVIEW_CACHE_SIZE = 64
+
+/** Main-thread ownership; cancellation invalidates even a non-cooperative late response. */
+internal fun HomeViewModel.cancelTrailerPreviewPipeline() {
+    trailerPreviewRequestVersion++
+    trailerPreviewJob?.cancel()
+    trailerPreviewJob = null
+    activeTrailerPreviewItemId = null
+}
 
 private data class CoreLayoutPrefs(
     val layout: HomeLayout,
@@ -382,17 +393,15 @@ internal fun HomeViewModel.requestTrailerPreviewPipeline(
     // Resolve fallbackYtId from catalog item if not provided
     val resolvedFallbackYtId = fallbackYtId ?: findCatalogItemById(itemId)?.trailerYtIds?.firstOrNull()
 
-    // Always bump version — only the latest request (highest version) will proceed after debounce
+    // Repeated focus notifications must not invalidate the only job resolving this item.
+    if (activeTrailerPreviewItemId == itemId && trailerPreviewJob?.isActive == true) return
+    cancelTrailerPreviewPipeline()
     activeTrailerPreviewItemId = itemId
-    trailerPreviewRequestVersion++
     val requestVersion = trailerPreviewRequestVersion
 
     if (trailerPreviewNegativeCache.contains(itemId)) return
     if (trailerPreviewUrlsState.containsKey(itemId)) return
-    if (!trailerPreviewLoadingIds.add(itemId)) return
-
-    trailerPreviewJob?.cancel()
-    trailerPreviewJob = viewModelScope.launch(Dispatchers.IO) {
+    trailerPreviewJob = viewModelScope.launch {
         try {
             // Debounce: wait for focus to settle before hitting network
             delay(180)
@@ -402,58 +411,47 @@ internal fun HomeViewModel.requestTrailerPreviewPipeline(
                 return@launch
             }
 
-            val tmdbId = try {
-                tmdbService.ensureTmdbId(itemId, apiType)
-            } catch (_: Exception) {
-                null
-            }
-
-            val trailerSource = trailerService.getTrailerPlaybackSource(
-                title = title,
-                year = extractYear(releaseInfo),
-                tmdbId = tmdbId,
-                type = apiType
-            )
-
-            withContext(Dispatchers.Main) {
-                if (trailerSource?.videoUrl.isNullOrBlank()) {
-                    val fallbackSource = resolvedFallbackYtId?.let { ytId ->
+            var completed = false
+            val source = withTimeoutOrNull(HOME_TRAILER_PREVIEW_TIMEOUT_MS) {
+                withContext(Dispatchers.IO) {
+                    val tmdbId = try {
+                        tmdbService.ensureTmdbId(itemId, apiType)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        null
+                    }
+                    val primary = trailerService.getTrailerPlaybackSource(
+                        title = title, year = extractYear(releaseInfo), tmdbId = tmdbId, type = apiType
+                    )
+                    primary?.takeIf { it.videoUrl.isNotBlank() } ?: resolvedFallbackYtId?.let { ytId ->
                         trailerService.getTrailerPlaybackSourceFromYouTubeUrl(
                             youtubeUrl = "https://www.youtube.com/watch?v=$ytId",
-                            title = title,
-                            year = extractYear(releaseInfo)
-                        )
+                            title = title, year = extractYear(releaseInfo)
+                        )?.takeIf { it.videoUrl.isNotBlank() }
                     }
-                    if (fallbackSource?.videoUrl != null) {
-                        if (trailerPreviewUrlsState[itemId] != fallbackSource.videoUrl) {
-                            trailerPreviewUrlsState[itemId] = fallbackSource.videoUrl
-                        }
-                        val fallbackAudio = fallbackSource.audioUrl
-                        if (fallbackAudio.isNullOrBlank()) {
-                            trailerPreviewAudioUrlsState.remove(itemId)
-                        } else if (trailerPreviewAudioUrlsState[itemId] != fallbackAudio) {
-                            trailerPreviewAudioUrlsState[itemId] = fallbackAudio
-                        }
-                    } else {
-                        trailerPreviewNegativeCache.add(itemId)
-                        trailerPreviewUrlsState.remove(itemId)
-                        trailerPreviewAudioUrlsState.remove(itemId)
-                    }
-                } else {
-                    val videoUrl = trailerSource.videoUrl
-                    if (trailerPreviewUrlsState[itemId] != videoUrl) {
-                        trailerPreviewUrlsState[itemId] = videoUrl
-                    }
-                    val audioUrl = trailerSource.audioUrl
-                    if (audioUrl.isNullOrBlank()) {
-                        trailerPreviewAudioUrlsState.remove(itemId)
-                    } else if (trailerPreviewAudioUrlsState[itemId] != audioUrl) {
-                        trailerPreviewAudioUrlsState[itemId] = audioUrl
-                    }
+                }.also { completed = true }
+            }
+            if (!completed || trailerPreviewRequestVersion != requestVersion || activeTrailerPreviewItemId != itemId) return@launch
+            if (source == null) {
+                trailerPreviewNegativeCache.add(itemId)
+                while (trailerPreviewNegativeCache.size > HOME_TRAILER_PREVIEW_CACHE_SIZE) {
+                    trailerPreviewNegativeCache.remove(trailerPreviewNegativeCache.first())
+                }
+            } else {
+                trailerPreviewUrlsState[itemId] = source.videoUrl
+                if (source.audioUrl.isNullOrBlank()) trailerPreviewAudioUrlsState.remove(itemId)
+                else trailerPreviewAudioUrlsState[itemId] = source.audioUrl
+                while (trailerPreviewUrlsState.size > HOME_TRAILER_PREVIEW_CACHE_SIZE) {
+                    val evicted = trailerPreviewUrlsState.keys.first { it != itemId }
+                    trailerPreviewUrlsState.remove(evicted)
+                    trailerPreviewAudioUrlsState.remove(evicted)
                 }
             }
-        } finally {
-            trailerPreviewLoadingIds.remove(itemId)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Transient failures keep the static artwork and may be retried on the next focus.
         }
     }
 }
@@ -507,6 +505,7 @@ private suspend fun HomeViewModel.fetchExternalMetaOutcome(item: MetaPreview): E
     }
 
 internal fun HomeViewModel.onItemFocusPipeline(item: MetaPreview) {
+    if (activeTrailerPreviewItemId != null && activeTrailerPreviewItemId != item.id) cancelTrailerPreviewPipeline()
     if (startupGracePeriodActive) {
         deferredEnrichItem = item
         return
@@ -989,10 +988,7 @@ private fun HomeViewModel.updateCatalogItemWithMeta(itemId: String, meta: Meta) 
     // Only retry if this item is currently focused — avoid prefetching trailers for adjacent items.
     if (incomingTrailerYtIds.isNotEmpty() && !trailerPreviewUrlsState.containsKey(itemId) && activeTrailerPreviewItemId == itemId) {
         trailerPreviewNegativeCache.remove(itemId)
-        trailerPreviewLoadingIds.remove(itemId)
-        // Bump version so any in-flight pipeline for this item treats itself as stale
-        // and won't overwrite the retry result with a negative cache entry.
-        trailerPreviewRequestVersion++
+        cancelTrailerPreviewPipeline()
         val currentItem = findCatalogItemById(itemId) ?: return
         requestTrailerPreviewPipeline(currentItem)
     }

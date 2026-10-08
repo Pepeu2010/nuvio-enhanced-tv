@@ -176,12 +176,11 @@ internal suspend fun HomeViewModel.loadAllCatalogsPipeline(
     reconcilePosterStatusObserversPipeline(emptyList())
     _fullCatalogRows.value = emptyList()
     hasRenderedFirstCatalog = false
-    trailerPreviewLoadingIds.clear()
+    cancelTrailerPreviewPipeline()
     trailerPreviewNegativeCache.clear()
     trailerPreviewUrlsState.clear()
     trailerPreviewAudioUrlsState.clear()
     activeTrailerPreviewItemId = null
-    trailerPreviewRequestVersion = 0L
     prefetchedExternalMetaIds.clear()
     externalMetaPrefetchInFlightIds.clear()
     externalMetaPrefetchJob?.cancel()
