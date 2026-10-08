@@ -56,6 +56,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -193,6 +194,9 @@ fun PlayerScreen(
     val sourceStreamsFocusRequester = remember { FocusRequester() }
     val skipIntroFocusRequester = remember { FocusRequester() }
     val streamInfoFocusRequester = remember { FocusRequester() }
+    val bookmarksFocusRequester = remember { FocusRequester() }
+    var restoreBookmarksFocus by remember { mutableStateOf(false) }
+    val bookmarkState by viewModel.sceneBookmarks.state.collectAsState()
     val postPlayRecommendationFocusRequester = remember { FocusRequester() }
     val postPlayRecommendationPlayerWindowFocusRequester = remember { FocusRequester() }
     var skipButtonActuallyVisible by remember { mutableStateOf(false) }
@@ -303,7 +307,10 @@ fun PlayerScreen(
 
     val handleBackPress = handleBackPress@{
         if (externalHandoffInProgress) return@handleBackPress
-        if (postPlayRecommendationState.canReturnToPlayer && !uiState.playbackEnded) {
+        if (uiState.showSceneBookmarks) {
+            viewModel.onEvent(PlayerEvent.OnDismissSceneBookmarks)
+            restoreBookmarksFocus = true
+        } else if (postPlayRecommendationState.canReturnToPlayer && !uiState.playbackEnded) {
             returnToPlayerFromPostPlay()
             viewModel.hideControls()
         } else if (postPlayRecommendationState.isVisible || postPlayRecommendationState.isLoadingRecommendation) {
@@ -553,6 +560,25 @@ fun PlayerScreen(
         }
     }
     val moreDialogOpen by rememberUpdatedState(uiState.showMoreDialog)
+    LaunchedEffect(restoreBookmarksFocus, uiState.showMoreDialog, uiState.showControls) {
+        if (restoreBookmarksFocus && uiState.showMoreDialog && uiState.showControls) {
+            bookmarksFocusRequester.requestFocusAfterFrames()
+            restoreBookmarksFocus = false
+        }
+    }
+    if (uiState.showSceneBookmarks) {
+        val timeline by viewModel.playbackTimeline.collectAsState()
+        val dismiss = {
+            viewModel.onEvent(PlayerEvent.OnDismissSceneBookmarks)
+            restoreBookmarksFocus = true
+        }
+        SceneBookmarksDialog(bookmarkState, timeline.currentPosition,
+            canSave = !timeline.isLive && timeline.duration > 0 && timeline.currentPosition in 0 until timeline.duration,
+            onSave = viewModel.sceneBookmarks::save, onRename = viewModel.sceneBookmarks::rename,
+            onRemove = viewModel.sceneBookmarks::remove,
+            onJump = { if (viewModel.sceneBookmarks.jump(it)) dismiss() }, onRetry = viewModel.sceneBookmarks::retry,
+            onDismiss = dismiss)
+    }
     val controlsVisibleForMoreBack by rememberUpdatedState(uiState.showControls)
     val playerHasError by rememberUpdatedState(uiState.error != null)
     LaunchedEffect(focusPlayAfterMoreBack) {
@@ -1344,6 +1370,8 @@ fun PlayerScreen(
                 onShowAudioDialog = { viewModel.onEvent(PlayerEvent.OnShowAudioOverlay) },
                 onShowSubtitleDialog = { viewModel.onEvent(PlayerEvent.OnShowSubtitleOverlay) },
                 onShowSpeedDialog = { viewModel.onEvent(PlayerEvent.OnShowSpeedDialog) },
+                onShowSceneBookmarks = { viewModel.onEvent(PlayerEvent.OnShowSceneBookmarks) },
+                bookmarksFocusRequester = bookmarksFocusRequester,
                 onToggleAspectRatio = {
                     Log.d("PlayerScreen", "onToggleAspectRatio called - dispatching event")
                     viewModel.onEvent(PlayerEvent.OnToggleAspectRatio)
@@ -2158,6 +2186,8 @@ private fun PlayerControlsOverlay(
     onShowAudioDialog: () -> Unit,
     onShowSubtitleDialog: () -> Unit,
     onShowSpeedDialog: () -> Unit,
+    onShowSceneBookmarks: () -> Unit,
+    bookmarksFocusRequester: FocusRequester,
     onToggleAspectRatio: () -> Unit,
     onSwitchPlayerEngine: () -> Unit,
     onReportPlaybackIssue: () -> Unit,
@@ -2433,6 +2463,15 @@ private fun PlayerControlsOverlay(
                             horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.xs),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            if (!isLivePlayback && playbackTimeline.duration > 0) ControlButton(
+                                icon = Icons.Default.Flag,
+                                contentDescription = stringResource(R.string.scene_bookmarks_title),
+                                onClick = onShowSceneBookmarks,
+                                focusRequester = bookmarksFocusRequester,
+                                upFocusRequester = progressUpTarget,
+                                onDownKey = onHideControls,
+                                onFocused = onResetHideTimer
+                            )
                             ControlButton(
                                 icon = Icons.Default.Speed,
                                 contentDescription = stringResource(R.string.cd_playback_speed),
@@ -2523,7 +2562,9 @@ private fun PlayerControlsProgressBarHost(
 ) {
     val playbackTimeline by viewModel.playbackTimeline.collectAsState()
     val metadataState by viewModel.uiState.collectAsState()
-    val markers = rememberPlayerTimedMarkers(metadataState.timedMetadata, playbackTimeline.duration)
+    val bookmarkState by viewModel.sceneBookmarks.state.collectAsState()
+    val markers = rememberPlayerTimedMarkers(metadataState.timedMetadata, playbackTimeline.duration) +
+        bookmarkState.let { viewModel.sceneBookmarks.markers(playbackTimeline.duration) }
 
     PlayerProgressBar(
         timedMarkers = markers,
@@ -2881,9 +2922,11 @@ private fun SeekOverlay(
 private fun SeekOverlayHost(viewModel: PlayerViewModel) {
     val playbackTimeline by viewModel.playbackTimeline.collectAsState()
     val metadataState by viewModel.uiState.collectAsState()
+    val bookmarkState by viewModel.sceneBookmarks.state.collectAsState()
 
     SeekOverlay(
-        timedMarkers = rememberPlayerTimedMarkers(metadataState.timedMetadata, playbackTimeline.duration),
+        timedMarkers = rememberPlayerTimedMarkers(metadataState.timedMetadata, playbackTimeline.duration) +
+            bookmarkState.let { viewModel.sceneBookmarks.markers(playbackTimeline.duration) },
         currentPosition = playbackTimeline.currentPosition,
         duration = playbackTimeline.duration,
         bufferedPosition = playbackTimeline.bufferedPosition
@@ -3746,7 +3789,7 @@ internal fun DialogButton(
     }
 }
 
-private fun formatTime(millis: Long): String {
+internal fun formatTime(millis: Long): String {
     if (millis <= 0) return "0:00"
 
     val hours = TimeUnit.MILLISECONDS.toHours(millis)

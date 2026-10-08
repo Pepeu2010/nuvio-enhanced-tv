@@ -97,6 +97,7 @@ class PlayerViewModel @Inject constructor(
     private val externalPlaybackTracker: com.nuvio.tv.core.player.ExternalPlaybackTracker,
     private val subtitleFileCache: com.nuvio.tv.core.player.SubtitleFileCache,
     private val tvRecommendationManager: com.nuvio.tv.core.recommendations.TvRecommendationManager,
+    private val sceneBookmarkRepository: com.nuvio.tv.core.player.metadata.SceneBookmarkRepository,
     profileManager: com.nuvio.tv.core.profile.ProfileManager,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -174,6 +175,11 @@ class PlayerViewModel @Inject constructor(
 
     val uiState: StateFlow<PlayerUiState>
         get() = controller.uiState
+
+    internal val sceneBookmarks = PlayerSceneBookmarks(sceneBookmarkRepository, controller.uiState,
+        controller.playbackTimeline, controller.profileId, controller.contentId, controller.contentType, viewModelScope) {
+        controller.onEvent(PlayerEvent.OnSeekTo(it))
+    }
 
     val playbackTimeline: StateFlow<PlaybackTimelineState>
         get() = controller.playbackTimeline

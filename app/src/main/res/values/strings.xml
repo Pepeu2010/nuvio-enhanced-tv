@@ -1,4 +1,18 @@
 <resources>
+    <string name="scene_bookmarks_title">Saved moments</string>
+    <string name="scene_bookmarks_scope_notice">Saved on this device for this profile, episode and source. Another cut may use different timestamps.</string>
+    <string name="scene_bookmarks_name">Moment name</string>
+    <string name="scene_bookmarks_default_name">Favorite scene</string>
+    <string name="scene_bookmarks_save">Save %1$s</string>
+    <string name="scene_bookmarks_rename">Rename</string>
+    <string name="scene_bookmarks_remove">Remove</string>
+    <string name="scene_bookmarks_loading">Updating saved moments…</string>
+    <string name="scene_bookmarks_error">Could not read or save moments. Your existing data was preserved.</string>
+    <string name="scene_bookmarks_retry">Retry</string>
+    <string name="scene_bookmarks_unavailable">Wait for the profile and content to become available.</string>
+    <string name="scene_bookmarks_empty">Save a scene to return to it later, even offline.</string>
+    <string name="scene_bookmarks_cancel">Cancel rename</string>
+    <string name="scene_bookmarks_close">Close</string>
     <string name="app_name">Telumia</string>
     <string name="tv_channel_continue_watching">Continue Watching</string>
     <string name="type_movie">Movie</string>

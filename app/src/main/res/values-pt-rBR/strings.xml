@@ -1,4 +1,18 @@
 <resources>
+    <string name="scene_bookmarks_title">Momentos salvos</string>
+    <string name="scene_bookmarks_scope_notice">Salvos neste aparelho para este perfil, episódio e fonte. Outro corte pode ter timestamps diferentes.</string>
+    <string name="scene_bookmarks_name">Nome do momento</string>
+    <string name="scene_bookmarks_default_name">Cena favorita</string>
+    <string name="scene_bookmarks_save">Salvar %1$s</string>
+    <string name="scene_bookmarks_rename">Renomear</string>
+    <string name="scene_bookmarks_remove">Remover</string>
+    <string name="scene_bookmarks_loading">Atualizando momentos salvos…</string>
+    <string name="scene_bookmarks_error">Não foi possível ler ou salvar. Os dados existentes foram preservados.</string>
+    <string name="scene_bookmarks_retry">Tentar novamente</string>
+    <string name="scene_bookmarks_unavailable">Aguarde a disponibilidade do perfil e do conteúdo.</string>
+    <string name="scene_bookmarks_empty">Salve uma cena para voltar a ela depois, mesmo offline.</string>
+    <string name="scene_bookmarks_cancel">Cancelar edição</string>
+    <string name="scene_bookmarks_close">Fechar</string>
     <string name="app_name">Telumia</string>
     <string name="tv_channel_continue_watching">Continuar Assistindo</string>
     <string name="type_movie">Filme</string>

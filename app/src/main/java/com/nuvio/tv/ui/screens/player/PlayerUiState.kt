@@ -117,6 +117,7 @@ data class PlayerUiState(
     val subtitleAutoSyncLoadedTrackKey: String? = null,
     val showSpeedDialog: Boolean = false,
     val showMoreDialog: Boolean = false,
+    val showSceneBookmarks: Boolean = false,
     // Subtitle style settings
     val subtitleStyle: SubtitleStyleSettings = SubtitleStyleSettings(),
     // Addon subtitles
@@ -291,6 +292,8 @@ sealed class PlayerEvent {
     data class OnSelectAddonSubtitle(val subtitle: Subtitle) : PlayerEvent()
     data class OnSetPlaybackSpeed(val speed: Float) : PlayerEvent()
     data object OnToggleControls : PlayerEvent()
+    data object OnShowSceneBookmarks : PlayerEvent()
+    data object OnDismissSceneBookmarks : PlayerEvent()
     data object OnShowAudioOverlay : PlayerEvent()
     data object OnShowSubtitleOverlay : PlayerEvent()
     data object OnOpenSubtitleStylePanel : PlayerEvent()
