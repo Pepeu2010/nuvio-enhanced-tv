@@ -127,7 +127,7 @@ class MediaCacheSettingsTvTest {
             assertEquals(307L, download.length())
             assertEquals(124L, cache.deviceSnapshot.occupiedCacheBytes)
             assertEquals(MediaCachePolicy.resolve(MediaCachePlatform.TV, cache.activeSettings, cache.deviceSnapshot), cache.activeBudget)
-        } finally { Os.unlink(link.absolutePath) }
+        } finally { java.nio.file.Files.delete(link.toPath()) }
     }
 
     @Test fun nativeDirectoryIterationStopsAtItsEntryBudget() {

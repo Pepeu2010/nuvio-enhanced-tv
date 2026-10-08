@@ -28,6 +28,18 @@ class MediaCachePolicyTest {
         assertEquals(0L, MediaCachePolicy.resolve(MediaCachePlatform.TV, MediaCacheSettings(), MediaCacheDeviceSnapshot(usableStorageBytes = 0)).totalBytes)
     }
 
+    @Test fun occupiedCacheNeverOverridesTheRealFreeSpaceReserve() {
+        for (platform in MediaCachePlatform.entries) for (mode in MediaCacheMode.entries) {
+            for (free in listOf(0L, platform.reserveBytes - 1, platform.reserveBytes)) {
+                val budget = MediaCachePolicy.resolve(platform, MediaCacheSettings(mode, 4096L * MIB),
+                    MediaCacheDeviceSnapshot(usableStorageBytes = free, occupiedCacheBytes = Long.MAX_VALUE))
+                assertEquals(0L, budget.totalBytes)
+                assertTrue(MediaCacheConstraint.STORAGE_RESERVE in budget.constraints)
+                assertTrue(budget.requestedBytes > 0)
+            }
+        }
+    }
+
     @Test fun malformedSettingsAndExtremeTelemetryCannotOverflowOrOverallocate() {
         val budget = MediaCachePolicy.resolve(MediaCachePlatform.DESKTOP, MediaCacheSettings(MediaCacheMode.MANUAL, Long.MAX_VALUE),
             MediaCacheDeviceSnapshot(usableStorageBytes = Long.MAX_VALUE, occupiedCacheBytes = Long.MAX_VALUE))

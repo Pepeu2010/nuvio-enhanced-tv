@@ -44,7 +44,9 @@ object MediaCachePolicy {
             (combined - platform.reserveBytes).coerceAtLeast(0)
         }
         val storageCeiling = available?.let { if (settings.mode == MediaCacheMode.AUTO) it / 10 else it }
-        val effective = storageCeiling?.let { requested.coerceAtMost(it) } ?: requested
+        // Occupied cache stabilizes the estimate, but cannot grant writes below the real free-space reserve.
+        val effective = if (free != null && free <= platform.reserveBytes) 0L
+            else storageCeiling?.let { requested.coerceAtMost(it) } ?: requested
         if (effective < requested) constraints += MediaCacheConstraint.STORAGE_RESERVE
         return MediaCacheBudget(effective, requested, constraints)
     }
