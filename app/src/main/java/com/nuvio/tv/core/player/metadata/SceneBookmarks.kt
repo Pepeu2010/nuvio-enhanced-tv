@@ -55,7 +55,9 @@ internal class SceneBookmarkStore(
     companion object { const val MAX_BOOKMARKS = 256; const val MAX_BYTES = 512 * 1024 }
     private val json = Json { ignoreUnknownKeys = true }
 
-    @Synchronized fun load(scope: SceneBookmarkScope): List<SceneBookmark> {
+    @Synchronized fun load(scope: SceneBookmarkScope): List<SceneBookmark> = all(scope).filter { it.editionKey == scope.editionKey }
+
+    @Synchronized fun all(scope: SceneBookmarkScope): List<SceneBookmark> {
         val file = file(scope, false) ?: return emptyList()
         if (!Files.exists(file, NOFOLLOW_LINKS)) return emptyList()
         check(Files.isRegularFile(file, NOFOLLOW_LINKS) && Files.size(file) in 1..MAX_BYTES.toLong())
@@ -82,7 +84,7 @@ internal class SceneBookmarkStore(
         require(durationMs > 0 && positionMs in 0 until durationMs && nowMs > 0)
         val label = name.trim()
         require(label.length in 1..128 && label.none(Char::isISOControl))
-        val previous = load(scope) // Unknown/malformed data is preserved; never overwrite it with an empty list.
+        val previous = all(scope) // Unknown/malformed data is preserved; never overwrite it with an empty list.
         check(previous.size < MAX_BOOKMARKS) { "Bookmark capacity reached" }
         val item = SceneBookmark(UUID.randomUUID().toString(), scope.mediaId, scope.mediaType, scope.videoId,
             scope.editionKey, positionMs, label, nowMs)
@@ -93,14 +95,14 @@ internal class SceneBookmarkStore(
     @Synchronized fun rename(scope: SceneBookmarkScope, id: String, name: String): List<SceneBookmark> {
         val label = name.trim()
         require(label.length in 1..128 && label.none(Char::isISOControl))
-        val previous = load(scope)
+        val previous = all(scope)
         check(previous.any { it.id == id })
         write(scope, previous.map { if (it.id == id) it.copy(name = label) else it })
         return load(scope)
     }
 
     @Synchronized fun remove(scope: SceneBookmarkScope, id: String): List<SceneBookmark> {
-        val previous = load(scope)
+        val previous = all(scope)
         val next = previous.filterNot { it.id == id }
         if (next.size != previous.size) write(scope, next)
         return next
@@ -109,7 +111,7 @@ internal class SceneBookmarkStore(
     private fun valid(item: SceneBookmark, scope: SceneBookmarkScope): Boolean =
         runCatching { UUID.fromString(item.id).toString() == item.id }.getOrDefault(false) &&
             item.mediaId == scope.mediaId && item.mediaType == scope.mediaType && item.videoId == scope.videoId &&
-            item.editionKey == scope.editionKey && item.positionMs >= 0 && item.positionMs < Long.MAX_VALUE &&
+            Regex("[a-f0-9]{64}").matches(item.editionKey) && item.positionMs >= 0 && item.positionMs < Long.MAX_VALUE &&
             item.createdAtMs > 0 && item.name.length in 1..128 && item.name.isNotBlank() && item.name.none(Char::isISOControl)
 
     private fun file(scope: SceneBookmarkScope, create: Boolean): Path? {
@@ -122,7 +124,7 @@ internal class SceneBookmarkStore(
         if (create) Files.createDirectories(directory)
         if (!Files.exists(directory, NOFOLLOW_LINKS)) return null
         check(directory.toRealPath().startsWith(root.toRealPath()))
-        val key = json.encodeToString(listOf(scope.mediaType, scope.mediaId, scope.videoId, scope.editionKey))
+        val key = json.encodeToString(listOf(scope.mediaType, scope.mediaId, scope.videoId))
         return directory.resolve("${bookmarkDigest(key)}.json")
     }
 
@@ -141,9 +143,10 @@ internal fun bookmarkDigest(value: String): String = MessageDigest.getInstance("
     .digest(value.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
 
 internal fun List<SceneBookmark>.toBookmarkMarkers(durationMs: Long): List<PlayerTimedMarker> {
+    val first = firstOrNull() ?: return emptyList()
     if (durationMs <= 0) return emptyList()
-    return filter { it.positionMs < durationMs }.map {
-        PlayerTimedMarker("local-bookmark:${it.id}", TimedMetadataKind.BOOKMARK,
-            (it.positionMs.toDouble() / durationMs).toFloat(), null, it.name, "local-user")
-    }
+    return TimedMetadataTimeline.create(TimedMetadataScope(first.mediaId, first.mediaType, first.videoId, first.editionKey),
+        map { TimedMetadataEvent(it.id, it.positionMs, body = TimedMetadataBody.Bookmark(it.name),
+            provenance = TimedMetadataProvenance("local-user", it.id)) }, durationMs)
+        .toPlayerMarkers(durationMs) { "" }
 }

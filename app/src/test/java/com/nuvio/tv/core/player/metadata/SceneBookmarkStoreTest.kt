@@ -20,7 +20,7 @@ class SceneBookmarkStoreTest {
         assertEquals(listOf(32_180L,72_430L), later.map { it.positionMs })
         assertEquals(listOf(1234L,5678L), later.map { it.createdAtMs })
         Files.walk(root).use { paths -> paths.filter { Files.isRegularFile(it) }.forEach {
-            assertFalse(Files.readString(it).contains("private")); assertFalse(Files.readString(it).contains("provider.invalid"))
+            assertFalse(it.toFile().readText().contains("private")); assertFalse(it.toFile().readText().contains("provider.invalid"))
         } }
     }
     @Test fun separatesAccountsProfileGenerationsEpisodesAndCuts() = sandbox { _, store ->
@@ -40,6 +40,14 @@ class SceneBookmarkStoreTest {
         assertEquals(all.last(), renamed.last())
         assertEquals(listOf(all.last()), store.remove(scope, first.id))
     }
+    @Test fun momentsFromOtherCutsStayAccessibleWithoutBeingProjectedAsCurrentCut() = sandbox { _,store ->
+        val first=store.save(scope,12_000,100_000,"Corte brasileiro",1234).single()
+        val other=scope.copy(editionKey=SceneBookmarkScope.sourceEdition("original-31"))
+        val second=store.save(other,20_000,100_000,"Outro corte",5678).single()
+        assertEquals(listOf(first,second),store.all(scope))
+        assertEquals(listOf(first),store.load(scope));assertEquals(listOf(second),store.load(other))
+        store.remove(scope,second.id);assertEquals(listOf(first),store.all(other))
+    }
     @Test fun invalidPositionsAndLabelsCannotReplaceExistingData() = sandbox { _, store ->
         val existing = store.save(scope, 12_000, 100_000, "Uma cena", 1234)
         for ((position,duration,name) in listOf(Triple(-1L,100_000L,"ok"),Triple(100_000L,100_000L,"ok"),
@@ -52,9 +60,9 @@ class SceneBookmarkStoreTest {
         store.save(scope,12_000,100_000,"Uma cena",1234)
         val file = Files.walk(root).use { it.filter { Files.isRegularFile(it) }.findFirst().get() }
         for (payload in listOf("{\"schemaVersion\":99,\"items\":[]}", "{bad")) {
-            Files.writeString(file,payload)
+            file.toFile().writeText(payload)
             try { store.save(scope,20_000,100_000,"Outra"); fail("Unsupported document changed") } catch (_: Exception) { }
-            assertEquals(payload,Files.readString(file))
+            assertEquals(payload,file.toFile().readText())
         }
     }
     @Test fun failedAtomicPublicationPreservesPreviousDataAndCleansTemporaryFile() = sandbox { root,store ->
@@ -75,9 +83,9 @@ class SceneBookmarkStoreTest {
         store.save(hostile,1000,2000,"Seguro",1234)
         assertEquals(1,store.load(hostile).size)
         val directory=Files.list(root).use { it.findFirst().get() }
-        directory.toFile().deleteRecursively();Files.writeString(directory,"must stay")
+        directory.toFile().deleteRecursively();directory.toFile().writeText("must stay")
         try { store.save(hostile,1200,2000,"Outra");fail("Unsafe directory accepted") } catch (_:IllegalStateException) { }
-        assertEquals("must stay",Files.readString(directory))
+        assertEquals("must stay",directory.toFile().readText())
     }
     @Test fun projectsRealTimestampIntoExistingTimelineAndOmitsOutOfDurationPoints() = sandbox { _,store ->
         val items=store.save(scope,25_000,100_000,"Rever",1234)
@@ -87,4 +95,3 @@ class SceneBookmarkStoreTest {
         assertTrue(items.toBookmarkMarkers(20_000).isEmpty());assertTrue(items.toBookmarkMarkers(0).isEmpty())
     }
 }
-

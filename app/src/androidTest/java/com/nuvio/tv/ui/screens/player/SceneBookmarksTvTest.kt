@@ -46,7 +46,7 @@ class SceneBookmarksTvTest {
                 onSave={ state.value=state.value.copy(items=store.save(scope,32_180,100_000,it)) },
                 onRename={ id,name -> state.value=state.value.copy(items=store.rename(scope,id,name)) },
                 onRemove={ state.value=state.value.copy(items=store.remove(scope,it)) },
-                onJump={ id -> jumped=store.load(scope).first { it.id==id }.positionMs },onRetry={},onDismiss={})
+                onJump={ id,_ -> jumped=store.load(scope).first { it.id==id }.positionMs },onRetry={},onDismiss={})
         } }
         compose.onNodeWithTag("scene-bookmark-save").assertIsFocused()
         compose.onNodeWithTag("scene-bookmark-name").performTextReplacement("Cena favorita para rever com a família")
@@ -70,7 +70,7 @@ class SceneBookmarksTvTest {
         val state=mutableStateOf(SceneBookmarkPanelState(scope,loading=true))
         var dismissed=false
         compose.setContent { NuvioTheme(navigationMotion=NavigationMotion.OFF) {
-            SceneBookmarksDialog(state.value,0,false,onSave={fail("save during load")},onRename={_,_->},onRemove={},onJump={},onRetry={},onDismiss={dismissed=true})
+            SceneBookmarksDialog(state.value,0,false,onSave={fail("save during load")},onRename={_,_->},onRemove={},onJump={_,_->},onRetry={},onDismiss={dismissed=true})
         } }
         compose.onNodeWithTag("scene-bookmark-save").assertIsNotEnabled()
         compose.onNodeWithTag("scene-bookmark-close").assertIsFocused()
@@ -84,7 +84,7 @@ class SceneBookmarksTvTest {
         var retries=0
         val state=mutableStateOf(SceneBookmarkPanelState(scope,listOf(item),loading=false,failed=true))
         compose.setContent { NuvioTheme(navigationMotion=NavigationMotion.OFF) {
-            SceneBookmarksDialog(state.value,0,true,onSave={fail("write through error")},onRename={_,_->},onRemove={},onJump={},
+            SceneBookmarksDialog(state.value,0,true,onSave={fail("write through error")},onRename={_,_->},onRemove={},onJump={_,_->},
                 onRetry={retries++;state.value=SceneBookmarkPanelState(scope,store.load(scope),loading=false)},onDismiss={})
         } }
         compose.onNodeWithTag("scene-bookmark-save").assertIsNotEnabled()
@@ -94,5 +94,22 @@ class SceneBookmarksTvTest {
         instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
         compose.waitForIdle();assertEquals(1,retries);assertEquals(item,store.load(scope).single())
         compose.onNodeWithTag("scene-bookmark-jump-${item.id}").assertIsEnabled().assertIsDisplayed()
+    }
+    @Test fun renewedOrDifferentSourceRequiresAnExplicitCutConfirmation() = sandbox { store ->
+        val other=scope.copy(editionKey=SceneBookmarkScope.sourceEdition("another-url-or-cut"))
+        val item=store.save(other,42_000,100_000,"Cena em outra fonte",1234).single()
+        var jumps=0
+        compose.setContent { NuvioTheme(navigationMotion=NavigationMotion.OFF) {
+            SceneBookmarksDialog(SceneBookmarkPanelState(scope,store.all(scope),loading=false),0,true,
+                onSave={},onRename={_,_->},onRemove={},onJump={id,confirmed -> assertEquals(item.id,id);assertTrue(confirmed);jumps++},onRetry={},onDismiss={})
+        } }
+        activate("scene-bookmark-jump-${item.id}")
+        assertEquals(0,jumps)
+        compose.onNodeWithTag("scene-bookmark-confirm").assertIsDisplayed()
+        File(context.getExternalFilesDir(null),"telumia-scene-bookmarks-confirm-tv.png").outputStream().use {
+            instrumentation.uiAutomation.takeScreenshot().compress(Bitmap.CompressFormat.PNG,100,it)
+        }
+        activate("scene-bookmark-confirm")
+        assertEquals(1,jumps);assertEquals(item,store.load(other).single())
     }
 }

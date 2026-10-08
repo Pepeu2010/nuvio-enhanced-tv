@@ -31,6 +31,8 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
@@ -573,10 +575,10 @@ fun PlayerScreen(
             restoreBookmarksFocus = true
         }
         SceneBookmarksDialog(bookmarkState, timeline.currentPosition,
-            canSave = !timeline.isLive && timeline.duration > 0 && timeline.currentPosition in 0 until timeline.duration,
+            canSave = !uiState.isBuffering && uiState.error == null && !timeline.isLive && timeline.duration > 0 && timeline.currentPosition in 0 until timeline.duration,
             onSave = viewModel.sceneBookmarks::save, onRename = viewModel.sceneBookmarks::rename,
             onRemove = viewModel.sceneBookmarks::remove,
-            onJump = { if (viewModel.sceneBookmarks.jump(it)) dismiss() }, onRetry = viewModel.sceneBookmarks::retry,
+            onJump = { id, confirmed -> if (viewModel.sceneBookmarks.jump(id, confirmed)) dismiss() }, onRetry = viewModel.sceneBookmarks::retry,
             onDismiss = dismiss)
     }
     val controlsVisibleForMoreBack by rememberUpdatedState(uiState.showControls)
@@ -2360,6 +2362,7 @@ private fun PlayerControlsOverlay(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
+                    modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(4.dp),
                     horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.xs),
                     verticalAlignment = Alignment.CenterVertically
                 ) {

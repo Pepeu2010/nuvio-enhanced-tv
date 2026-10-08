@@ -1,5 +1,9 @@
 <resources>
     <string name="scene_bookmarks_title">Saved moments</string>
+    <string name="scene_bookmarks_other_source">Saved with another source</string>
+    <string name="scene_bookmarks_confirm_notice">This moment was saved with another source. Confirm it uses the same cut before applying its timestamp.</string>
+    <string name="scene_bookmarks_confirm">Use this timestamp</string>
+    <string name="scene_bookmarks_cancel_jump">Keep watching here</string>
     <string name="scene_bookmarks_scope_notice">Saved on this device for this profile, episode and source. Another cut may use different timestamps.</string>
     <string name="scene_bookmarks_name">Moment name</string>
     <string name="scene_bookmarks_default_name">Favorite scene</string>

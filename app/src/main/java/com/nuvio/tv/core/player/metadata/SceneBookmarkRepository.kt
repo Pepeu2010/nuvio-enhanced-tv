@@ -31,16 +31,16 @@ class SceneBookmarkRepository @Inject constructor(
             ?.let { ProfileAvatarScope.resolve(it, auth.authState.value) } == scope.owner
 
     internal suspend fun load(scope: SceneBookmarkScope) = withContext(Dispatchers.IO) {
-        check(eligible(scope)); store.load(scope)
+        check(eligible(scope)); store.all(scope)
     }
     internal suspend fun save(scope: SceneBookmarkScope, position: Long, duration: Long, name: String) = withContext(Dispatchers.IO) {
-        check(eligible(scope)); store.save(scope, position, duration, name).also { changed() }
+        check(eligible(scope)); store.save(scope, position, duration, name); changed(); store.all(scope)
     }
     internal suspend fun rename(scope: SceneBookmarkScope, id: String, name: String) = withContext(Dispatchers.IO) {
-        check(eligible(scope)); store.rename(scope, id, name).also { changed() }
+        check(eligible(scope)); store.rename(scope, id, name); changed(); store.all(scope)
     }
     internal suspend fun remove(scope: SceneBookmarkScope, id: String) = withContext(Dispatchers.IO) {
-        check(eligible(scope)); store.remove(scope, id).also { changed() }
+        check(eligible(scope)); store.remove(scope, id); changed(); store.all(scope)
     }
     private fun changed() { revision.update { it + 1 } }
 }

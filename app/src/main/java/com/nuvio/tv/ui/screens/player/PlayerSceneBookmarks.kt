@@ -39,10 +39,9 @@ internal class PlayerSceneBookmarks(
     init {
         coroutineScope.launch {
             combine(repository.owners(profileId), player.map {
-                Triple(it.currentVideoId ?: mediaId, it.currentStreamUrl, it.currentStreamInfoHash)
+                (it.currentVideoId ?: mediaId) to bookmarkSourceIdentity(it)
             }.distinctUntilChanged(), repository.revision) { owner, media, _ ->
-                val source = media.second?.takeIf(String::isNotBlank)
-                    ?: media.third?.takeIf(String::isNotBlank)?.let { "torrent:$it" }
+                val source = media.second
                 if (owner == null || source == null || mediaId.isNullOrBlank() || mediaType.isNullOrBlank() || media.first.isNullOrBlank()) null
                 else runCatching { SceneBookmarkScope(owner, mediaId, mediaType, media.first!!,
                     SceneBookmarkScope.sourceEdition(source)) }.getOrNull()
@@ -61,20 +60,21 @@ internal class PlayerSceneBookmarks(
 
     fun save(name: String) {
         val point = timeline.value
-        if (point.isLive || point.duration <= 0 || point.currentPosition !in 0 until point.duration) return
+        if (player.value.isBuffering || player.value.error != null || point.isLive || point.duration <= 0 || point.currentPosition !in 0 until point.duration) return
         mutate { repository.save(it, point.currentPosition, point.duration, name) }
     }
     fun rename(id: String, name: String) = mutate { repository.rename(it, id, name) }
     fun remove(id: String) = mutate { repository.remove(it, id) }
     fun retry() { repository.revision.value += 1 }
     fun markers(durationMs: Long) = state.value.takeIf { it.scope?.let(::current) == true }
-        ?.items?.toBookmarkMarkers(durationMs).orEmpty()
-    fun jump(id: String): Boolean {
+        ?.let { state -> state.items.filter { it.editionKey == state.scope!!.editionKey }.toBookmarkMarkers(durationMs) }.orEmpty()
+    fun jump(id: String, confirmOtherEdition: Boolean = false): Boolean {
         val snapshot = state.value
         val scope = snapshot.scope ?: return false
         val point = timeline.value
         val item = snapshot.items.firstOrNull { it.id == id } ?: return false
         if (!current(scope) || point.isLive || item.positionMs !in 0 until point.duration) return false
+        if (item.editionKey != scope.editionKey && !confirmOtherEdition) return false
         seek(item.positionMs)
         return true
     }
@@ -96,9 +96,17 @@ internal class PlayerSceneBookmarks(
 
     private fun current(scope: SceneBookmarkScope): Boolean {
         val value = player.value
-        val source = value.currentStreamUrl?.takeIf(String::isNotBlank)
-            ?: value.currentStreamInfoHash?.takeIf(String::isNotBlank)?.let { "torrent:$it" }
+        val source = bookmarkSourceIdentity(value)
         return repository.eligible(scope) && (value.currentVideoId ?: mediaId) == scope.videoId &&
             source != null && SceneBookmarkScope.sourceEdition(source) == scope.editionKey
     }
+}
+
+/** A torrent plus file index survives renewed debrid URLs without guessing from a filename. */
+internal fun bookmarkSourceIdentity(value: PlayerUiState): String? {
+    val hash = value.currentStreamInfoHash?.trim()?.lowercase()
+    val index = value.currentStreamFileIdx
+    if (hash != null && Regex("(?:[a-f0-9]{40}|[a-f0-9]{64})").matches(hash) && index != null && index >= 0)
+        return "torrent:$hash:file:$index"
+    return value.currentStreamUrl?.takeIf { it.isNotBlank() && it.length <= 16384 }
 }

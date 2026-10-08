@@ -33,13 +33,14 @@ internal fun SceneBookmarksDialog(
     onSave: (String) -> Unit,
     onRename: (String, String) -> Unit,
     onRemove: (String) -> Unit,
-    onJump: (String) -> Unit,
+    onJump: (String, Boolean) -> Unit,
     onRetry: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val defaultName = stringResource(R.string.scene_bookmarks_default_name)
     var name by remember(state.scope) { mutableStateOf(defaultName) }
     var editingId by remember(state.scope) { mutableStateOf<String?>(null) }
+    var pendingJump by remember(state.scope) { mutableStateOf<String?>(null) }
     val first = remember { FocusRequester() }
     val close = remember { FocusRequester() }
     val writable = !state.loading && !state.busy && !state.failed && state.scope != null
@@ -53,7 +54,14 @@ internal fun SceneBookmarksDialog(
                 Text(stringResource(R.string.scene_bookmarks_title), style = androidx.tv.material3.MaterialTheme.typography.headlineSmall)
                 Text(stringResource(R.string.scene_bookmarks_scope_notice), style = androidx.tv.material3.MaterialTheme.typography.bodySmall,
                     color = NuvioTheme.colors.TextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (pendingJump != null) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.scene_bookmarks_confirm_notice), maxLines = 3)
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(onClick = { pendingJump?.let { onJump(it, true) }; pendingJump = null },
+                            modifier = Modifier.testTag("scene-bookmark-confirm")) { Text(stringResource(R.string.scene_bookmarks_confirm)) }
+                        Button(onClick = { pendingJump = null }) { Text(stringResource(R.string.scene_bookmarks_cancel_jump)) }
+                    }
+                } else Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(value = name, onValueChange = { name = it.filterNot(Char::isISOControl).take(128) },
                         label = { androidx.compose.material3.Text(stringResource(R.string.scene_bookmarks_name)) }, singleLine = true,
                         colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
@@ -85,10 +93,12 @@ internal fun SceneBookmarksDialog(
                     verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(4.dp)) {
                     items(state.items, key = { it.id }) { item ->
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Button(onClick = { onJump(item.id) }, enabled = writable,
+                            Button(onClick = { if (item.editionKey == state.scope?.editionKey) onJump(item.id, false) else pendingJump = item.id }, enabled = writable,
                                 modifier = Modifier.weight(1f).testTag("scene-bookmark-jump-${item.id}")) {
                                 Column {
                                     Text("${formatTime(item.positionMs)} · ${item.name}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    if (item.editionKey != state.scope?.editionKey) Text(stringResource(R.string.scene_bookmarks_other_source),
+                                        style = androidx.tv.material3.MaterialTheme.typography.labelSmall)
                                     Text(remember(item.createdAtMs) { DateFormat.getDateInstance(DateFormat.SHORT).format(Date(item.createdAtMs)) },
                                         style = androidx.tv.material3.MaterialTheme.typography.labelSmall)
                                 }

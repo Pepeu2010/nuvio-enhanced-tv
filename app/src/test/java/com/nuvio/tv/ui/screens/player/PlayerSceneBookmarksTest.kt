@@ -28,7 +28,7 @@ class PlayerSceneBookmarksTest {
         val ready=MutableStateFlow(true)
         val authState=MutableStateFlow<AuthState>(AuthState.SignedOut)
         val profiles=MutableStateFlow(listOf(UserProfile(id=2,name="Local",avatarColorHex="#223344",studioIdentity="identity-A")))
-        val player=MutableStateFlow(PlayerUiState(currentVideoId="show:1:2",currentStreamUrl="https://fixture.invalid/br-78"))
+        val player=MutableStateFlow(PlayerUiState(isBuffering=false,currentVideoId="show:1:2",currentStreamUrl="https://fixture.invalid/br-78"))
         val timeline=MutableStateFlow(PlaybackTimelineState(currentPosition=32_180,duration=100_000))
         val seeks=mutableListOf<Long>()
         val repo: SceneBookmarkRepository
@@ -65,10 +65,24 @@ class PlayerSceneBookmarksTest {
         await { controller.state.value.items.size==1 }
         player.value=player.value.copy(currentStreamUrl="https://fixture.invalid/original-31")
         assertFalse(controller.jump(item.id))
-        await { !controller.state.value.loading && controller.state.value.items.isEmpty() }
+        await { !controller.state.value.loading && controller.state.value.items.size==1 && controller.markers(100_000).isEmpty() }
+        assertFalse(controller.jump(item.id))
+        assertTrue(controller.jump(item.id, confirmOtherEdition=true))
         player.value=player.value.copy(currentStreamUrl="https://fixture.invalid/br-78")
         await { controller.state.value.items.size==1 }
         assertEquals(item,controller.state.value.items.single())
+    }
+    @Test fun knownTorrentFileIdentitySurvivesRenewedUrlsWithoutGuessingUnknownFiles() = fixture {
+        player.value=player.value.copy(currentStreamInfoHash="a".repeat(40),currentStreamFileIdx=2)
+        await { !controller.state.value.loading && controller.state.value.scope!=null }
+        controller.save("Cena");await { controller.state.value.items.size==1 && !controller.state.value.busy }
+        val item=controller.state.value.items.single()
+        player.value=player.value.copy(currentStreamUrl="https://fixture.invalid/renewed?token=new")
+        assertTrue(controller.jump(item.id));assertEquals(1,controller.markers(100_000).size)
+        player.value=player.value.copy(currentStreamFileIdx=3)
+        assertFalse(controller.jump(item.id));assertTrue(controller.markers(100_000).isEmpty())
+        val unknown=player.value.copy(currentStreamFileIdx=null)
+        assertEquals(unknown.currentStreamUrl,bookmarkSourceIdentity(unknown))
     }
     @Test fun switchingProfileOrSigningIntoAnotherAccountClearsVisibleDataAndRefusesStaleActions() = fixture {
         await { !controller.state.value.loading && controller.state.value.scope!=null }
@@ -96,10 +110,10 @@ class PlayerSceneBookmarksTest {
         controller.save("Cena");await { controller.state.value.items.size==1 && !controller.state.value.busy }
         val file=Files.walk(root).use { it.filter { path -> Files.isRegularFile(path) }.findFirst().get() }
         val future="{\"schemaVersion\":99,\"items\":[]}"
-        Files.writeString(file,future);controller.retry()
+        file.toFile().writeText(future);controller.retry()
         await { controller.state.value.failed };controller.save("Do not replace")
-        assertEquals(future,Files.readString(file))
+        assertEquals(future,file.toFile().readText())
         controller.retry();await { controller.state.value.failed }
-        assertEquals(future,Files.readString(file))
+        assertEquals(future,file.toFile().readText())
     }
 }
