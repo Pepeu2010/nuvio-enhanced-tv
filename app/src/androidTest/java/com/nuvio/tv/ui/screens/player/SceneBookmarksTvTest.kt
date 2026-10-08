@@ -50,11 +50,13 @@ class SceneBookmarksTvTest {
         } }
         compose.onNodeWithTag("scene-bookmark-save").assertIsFocused()
         compose.onNodeWithTag("scene-bookmark-name").performTextReplacement("Cena favorita para rever com a família")
+        compose.onNodeWithTag("scene-bookmark-name").performImeAction()
         activate("scene-bookmark-save")
         val item=store.load(scope).single()
         assertEquals(32_180L,item.positionMs)
         activate("scene-bookmark-rename-${item.id}")
         compose.onNodeWithTag("scene-bookmark-name").performTextReplacement("Rever depois")
+        compose.onNodeWithTag("scene-bookmark-name").performImeAction()
         activate("scene-bookmark-save")
         assertEquals("Rever depois",store.load(scope).single().name)
         activate("scene-bookmark-jump-${item.id}")
