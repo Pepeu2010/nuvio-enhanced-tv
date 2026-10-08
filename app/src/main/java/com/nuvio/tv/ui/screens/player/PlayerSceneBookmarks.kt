@@ -86,7 +86,7 @@ internal class PlayerSceneBookmarks(
         coroutineScope.launch {
             try {
                 val items = action(scope)
-                if (mutable.value.scope == scope && repository.eligible(scope)) mutable.value = SceneBookmarkPanelState(scope, items, loading = false)
+                if (mutable.value.scope == scope && current(scope)) mutable.value = SceneBookmarkPanelState(scope, items, loading = false)
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) {
                 if (mutable.value.scope == scope) mutable.value = snapshot.copy(busy = false, failed = true)

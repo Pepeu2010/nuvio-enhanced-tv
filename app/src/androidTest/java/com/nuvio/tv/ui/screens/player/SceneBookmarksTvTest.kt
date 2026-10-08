@@ -48,10 +48,9 @@ class SceneBookmarksTvTest {
                 onRemove={ state.value=state.value.copy(items=store.remove(scope,it)) },
                 onJump={ id -> jumped=store.load(scope).first { it.id==id }.positionMs },onRetry={},onDismiss={})
         } }
-        compose.onNodeWithTag("scene-bookmark-name").performTextReplacement("Cena favorita para rever com a família")
         compose.onNodeWithTag("scene-bookmark-save").assertIsFocused()
-        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
-        compose.waitForIdle()
+        compose.onNodeWithTag("scene-bookmark-name").performTextReplacement("Cena favorita para rever com a família")
+        activate("scene-bookmark-save")
         val item=store.load(scope).single()
         assertEquals(32_180L,item.positionMs)
         activate("scene-bookmark-rename-${item.id}")

@@ -59,7 +59,18 @@ internal class SceneBookmarkStore(
         val file = file(scope, false) ?: return emptyList()
         if (!Files.exists(file, NOFOLLOW_LINKS)) return emptyList()
         check(Files.isRegularFile(file, NOFOLLOW_LINKS) && Files.size(file) in 1..MAX_BYTES.toLong())
-        val document = json.decodeFromString<BookmarkDocument>(Files.readString(file))
+        val bytes = Files.newInputStream(file).use { input ->
+            val output = java.io.ByteArrayOutputStream()
+            val buffer = ByteArray(4096)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                check(output.size() + count <= MAX_BYTES)
+                output.write(buffer, 0, count)
+            }
+            output.toByteArray()
+        }
+        val document = json.decodeFromString<BookmarkDocument>(bytes.toString(Charsets.UTF_8))
         check(document.schemaVersion == 1) { "Newer bookmark schema" }
         check(document.items.size <= MAX_BOOKMARKS && document.items.map { it.id }.toSet().size == document.items.size)
         check(document.items.all { valid(it, scope) }) { "Invalid bookmark data" }
