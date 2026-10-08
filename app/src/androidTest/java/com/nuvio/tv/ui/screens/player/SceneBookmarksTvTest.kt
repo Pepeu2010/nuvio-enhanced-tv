@@ -1,6 +1,8 @@
 package com.nuvio.tv.ui.screens.player
 
 import android.graphics.Bitmap
+import android.accessibilityservice.AccessibilityServiceInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import android.view.KeyEvent
 import androidx.compose.runtime.*
 import androidx.compose.ui.semantics.SemanticsActions
@@ -35,6 +37,21 @@ class SceneBookmarksTvTest {
         instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
         compose.waitForIdle()
     }
+    private fun finishNameEditing() {
+        val automation = instrumentation.uiAutomation
+        automation.serviceInfo = automation.serviceInfo.apply {
+            flags = flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+        }
+        // Text replacement focuses the real field and asynchronously opens the TV IME.
+        // Finish only after that window exists, then wait for its removal before native OK.
+        compose.waitUntil(5_000) { automation.windows.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD } }
+        compose.onNodeWithTag("scene-bookmark-name").performImeAction()
+        compose.waitUntil(5_000) {
+            val windows = automation.windows
+            windows.any { it.type == AccessibilityWindowInfo.TYPE_APPLICATION } &&
+                windows.none { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
+        }
+    }
     private fun sandbox(block: (SceneBookmarkStore) -> Unit) {
         val root = File(context.filesDir,"scene-bookmark-qa-${UUID.randomUUID()}")
         try { block(SceneBookmarkStore(root.toPath())) } finally { root.deleteRecursively() }
@@ -51,14 +68,14 @@ class SceneBookmarksTvTest {
         } }
         compose.onNodeWithTag("scene-bookmark-save").assertIsFocused()
         compose.onNodeWithTag("scene-bookmark-name").performTextReplacement("Cena favorita para rever com a família")
-        compose.onNodeWithTag("scene-bookmark-name").performImeAction()
+        finishNameEditing()
         activate("scene-bookmark-save")
         compose.waitUntil(5_000) { store.load(scope).isNotEmpty() }
         val item=store.load(scope).single()
         assertEquals(32_180L,item.positionMs)
         activate("scene-bookmark-rename-${item.id}")
         compose.onNodeWithTag("scene-bookmark-name").performTextReplacement("Rever depois")
-        compose.onNodeWithTag("scene-bookmark-name").performImeAction()
+        finishNameEditing()
         activate("scene-bookmark-save")
         compose.waitUntil(5_000) { store.load(scope).single().name == "Rever depois" }
         assertEquals("Rever depois",store.load(scope).single().name)
