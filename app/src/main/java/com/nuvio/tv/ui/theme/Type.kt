@@ -13,10 +13,10 @@ import com.nuvio.tv.domain.model.AppFont
 
 /** Brand display face; the existing per-profile body-font preference is retained. */
 val TelumiaDisplayFamily = FontFamily(
-    Font(R.font.manrope_variable, FontWeight.Normal),
-    Font(R.font.manrope_variable, FontWeight.Medium),
-    Font(R.font.manrope_variable, FontWeight.SemiBold),
-    Font(R.font.manrope_variable, FontWeight.Bold)
+    Font(R.font.manrope_regular, FontWeight.Normal),
+    Font(R.font.manrope_medium, FontWeight.Medium),
+    Font(R.font.manrope_semibold, FontWeight.SemiBold),
+    Font(R.font.manrope_bold, FontWeight.Bold)
 )
 
 val DMSansFamily = FontFamily(
