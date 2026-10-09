@@ -9,13 +9,17 @@ import com.nuvio.tv.domain.model.TmdbCollectionSource
 import com.nuvio.tv.domain.model.TmdbCollectionSourceType
 import com.nuvio.tv.domain.model.TraktCollectionSource
 import io.mockk.mockk
+import io.mockk.every
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CollectionsDataStoreSourceMigrationTest {
     private val store = CollectionsDataStore(
-        appContext = mockk<Context>(relaxed = true),
+        appContext = mockk<Context>(relaxed = true) {
+            every { getString(com.nuvio.tv.R.string.collections_import_error_missing_trakt_list_id,
+                any(), any(), any()) } returns "Source requires a Trakt list ID"
+        },
         factory = mockk<ProfileDataStoreFactory>(relaxed = true),
         profileManager = mockk<ProfileManager>(relaxed = true),
         authManager = mockk(relaxed = true),
