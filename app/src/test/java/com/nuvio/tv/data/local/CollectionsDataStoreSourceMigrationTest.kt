@@ -17,7 +17,9 @@ class CollectionsDataStoreSourceMigrationTest {
     private val store = CollectionsDataStore(
         appContext = mockk<Context>(relaxed = true),
         factory = mockk<ProfileDataStoreFactory>(relaxed = true),
-        profileManager = mockk<ProfileManager>(relaxed = true)
+        profileManager = mockk<ProfileManager>(relaxed = true),
+        authManager = mockk(relaxed = true),
+        serverConfiguration = mockk(relaxed = true)
     )
 
     @Test

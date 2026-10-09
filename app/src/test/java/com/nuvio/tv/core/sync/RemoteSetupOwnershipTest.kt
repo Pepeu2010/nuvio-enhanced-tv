@@ -3,6 +3,9 @@ package com.nuvio.tv.core.sync
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import com.nuvio.tv.core.profile.ProfileManager
+import com.nuvio.tv.core.auth.AuthManager
+import com.nuvio.tv.domain.model.AuthState
+import com.nuvio.tv.domain.model.ServerConfiguration
 import com.nuvio.tv.data.local.AddonPreferences
 import com.nuvio.tv.data.local.CollectionsDataStore
 import com.nuvio.tv.data.local.ProfileDataStoreFactory
@@ -10,6 +13,7 @@ import io.mockk.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonArray
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -59,11 +63,15 @@ class RemoteSetupOwnershipTest {
         val memory = MemoryStore()
         val factory = mockk<ProfileDataStoreFactory>()
         every { factory.get(3, "collections") } returns memory
-        val store = CollectionsDataStore(mockk(relaxed = true), factory, mockk(relaxed = true))
-        var current = true
-        memory.beforeWrite = { current = false }
+        val account = MutableStateFlow<AuthState>(AuthState.FullAccount("fixture", "fixture@invalid.test"))
+        val auth = mockk<AuthManager> { every { authState } returns account }
+        val profiles = mockk<ProfileManager> { every { activeProfileId } returns MutableStateFlow(3) }
+        val config = mockk<ServerConfiguration> { every { backendUrl } returns "https://fixture.invalid" }
+        val store = CollectionsDataStore(mockk(relaxed = true), factory, profiles, auth, config)
+        val owner = store.captureSyncOwner()!!
+        memory.beforeWrite = { account.value = AuthState.SignedOut }
         var cancelled = false
-        try { store.applySyncedCollections(3, emptyList()) { current } }
+        try { store.reconcileRemote(owner, JsonArray(emptyList()), true) }
         catch (_: CancellationException) { cancelled = true }
         assertTrue(cancelled)
         assertEquals(0, memory.writes)

@@ -3,163 +3,95 @@ package com.nuvio.tv.core.sync
 import android.util.Log
 import com.nuvio.tv.core.auth.AuthManager
 import com.nuvio.tv.core.profile.ProfileManager
-import com.nuvio.tv.domain.model.AuthState
-import kotlinx.coroutines.CancellationException
 import com.nuvio.tv.data.local.CollectionsDataStore
-import com.nuvio.tv.data.remote.supabase.SupabaseCollectionBlob
+import com.nuvio.tv.data.local.CollectionSyncOwner
 import io.github.jan.supabase.postgrest.Postgrest
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
+import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import kotlinx.serialization.json.JsonNull
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private const val TAG = "CollectionSyncService"
-
 @Singleton
 class CollectionSyncService @Inject constructor(
-    private val postgrest: Postgrest,
-    private val authManager: AuthManager,
+    postgrest: Postgrest,
+    authManager: AuthManager,
     private val collectionsDataStore: CollectionsDataStore,
     private val profileManager: ProfileManager,
-    private val syncClientIdentity: SyncClientIdentity
+    syncClientIdentity: SyncClientIdentity
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-    @Volatile
-    var isSyncingFromRemote: Boolean = false
-
+    private val mutex = Mutex()
+    @Volatile var isSyncingFromRemote: Boolean = false
     private var pushJob: Job? = null
+    internal var remote: CollectionSyncRemote = CollectionRpcRemote(postgrest, authManager, syncClientIdentity)
 
-    private suspend fun <T> withJwtRefreshRetry(block: suspend () -> T): T {
-        return try {
-            block()
-        } catch (e: Exception) {
-            if (!authManager.refreshSessionIfJwtExpired(e)) throw e
-            block()
+    private suspend fun requireCurrent(owner: CollectionSyncOwner) {
+        currentCoroutineContext().ensureActive()
+        if (!collectionsDataStore.isCurrent(owner) || profileManager.activeProfileId.value != owner.profileId) {
+            throw CancellationException("Collection sync owner changed")
         }
     }
 
-    /**
-     * Push local collections JSON to Supabase via RPC.
-     * Uses a SECURITY DEFINER function to handle RLS for linked devices.
-     */
+    private suspend fun reconcile(owner: CollectionSyncOwner): Boolean = mutex.withLock {
+        requireCurrent(owner)
+        val blob = remote.pull(owner.profileId) { collectionsDataStore.isCurrent(owner) }
+        requireCurrent(owner)
+        check(blob == null || blob.profileId == owner.profileId) { "Collection response profile mismatch" }
+        val snapshot = when (val payload = blob?.collectionsJson) {
+            null, JsonNull -> JsonArray(emptyList())
+            is JsonArray -> payload
+            else -> error("Invalid remote collections JSON")
+        }
+        isSyncingFromRemote = true
+        val applied = try { collectionsDataStore.reconcileRemote(owner, snapshot, blob != null) }
+            finally { isSyncingFromRemote = false }
+        applied.upload?.let { (revision, uploaded) ->
+            requireCurrent(owner)
+            remote.push(owner.profileId, uploaded) { collectionsDataStore.isCurrent(owner) }
+            requireCurrent(owner)
+            collectionsDataStore.acknowledgeUpload(owner, revision, uploaded)
+        }
+        applied.changed
+    }
+
+    /** Pull, merge pending edits and upload through the existing official snapshot RPCs. */
     suspend fun pushToRemote(): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val account = (authManager.authState.value as? AuthState.FullAccount)?.userId
-                ?: return@withContext Result.failure(IllegalStateException("Collections require an account"))
-            val profileId = profileManager.activeProfileId.value
-            val json = collectionsDataStore.exportCurrentProfileJson()
-            if ((authManager.authState.value as? AuthState.FullAccount)?.userId != account ||
-                profileManager.activeProfileId.value != profileId) throw CancellationException("Collection sync owner changed")
-
-            val collectionsJsonElement = if (json.isNullOrBlank()) {
-                JsonArray(emptyList())
-            } else {
-                Json.parseToJsonElement(json)
-            }
-
-            val params = buildJsonObject {
-                put("p_profile_id", profileId)
-                put("p_collections_json", collectionsJsonElement)
-                putSyncOriginClientId(syncClientIdentity)
-            }
-
-            withJwtRefreshRetry {
-                postgrest.rpc("sync_push_collections", params)
-            }
-
-            Log.d(TAG, "Pushed collections to remote for profile $profileId")
+            val owner = collectionsDataStore.captureSyncOwner() ?: error("Collections require an account")
+            reconcile(owner)
             Result.success(Unit)
-        } catch (e: Exception) {
-            if (e is CancellationException) throw e
-            Log.e(TAG, "Failed to push collections to remote", e)
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) {
+            Log.w(TAG, "Collection upload deferred: ${e::class.simpleName}")
             Result.failure(e)
         }
     }
 
-    /**
-     * Pull remote collections JSON and apply locally.
-     * Returns true if local state was updated.
-     */
     suspend fun pullFromRemote(): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
-            val account = (authManager.authState.value as? AuthState.FullAccount)?.userId
-                ?: return@withContext Result.failure(IllegalStateException("Collections require an account"))
-            val profileId = profileManager.activeProfileId.value
-            fun stillCurrent() = (authManager.authState.value as? AuthState.FullAccount)?.userId == account &&
-                profileManager.activeProfileId.value == profileId
-
-            val params = buildJsonObject {
-                put("p_profile_id", profileId)
-            }
-
-            val response = withJwtRefreshRetry {
-                postgrest.rpc("sync_pull_collections", params)
-            }
-            val rows = response.decodeList<SupabaseCollectionBlob>()
-            if (!stillCurrent()) throw CancellationException("Collection sync owner changed")
-            val blob = rows.firstOrNull()
-            if (blob == null) {
-                Log.d(TAG, "No remote collections for profile $profileId; keeping local")
-                return@withContext Result.success(false)
-            }
-
-            val remoteJson = blob.collectionsJson.toString()
-            val remoteCollections = collectionsDataStore.importFromJson(remoteJson)
-
-            // Preserve local if remote is empty but local has data
-            val localCollections = collectionsDataStore.getCurrentCollections()
-            if (remoteCollections.isEmpty() && localCollections.isNotEmpty()) {
-                Log.w(TAG, "Remote collections empty while local has ${localCollections.size}; preserving local")
-                return@withContext Result.success(false)
-            }
-
-            // Check if different
-            val localJson = collectionsDataStore.exportCurrentProfileJson() ?: ""
-            if (remoteJson == localJson) {
-                Log.d(TAG, "Remote collections already match local for profile $profileId")
-                return@withContext Result.success(false)
-            }
-
-            isSyncingFromRemote = true
-            try {
-                collectionsDataStore.applySyncedCollections(profileId, remoteCollections, ::stillCurrent)
-            } finally {
-                isSyncingFromRemote = false
-            }
-
-            Log.d(TAG, "Applied ${remoteCollections.size} remote collections for profile $profileId")
-            Result.success(true)
-        } catch (e: Exception) {
-            if (e is CancellationException) throw e
-            Log.e(TAG, "Failed to pull collections from remote", e)
+            val owner = collectionsDataStore.captureSyncOwner() ?: error("Collections require an account")
+            Result.success(reconcile(owner))
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) {
+            Log.w(TAG, "Collection reconciliation deferred: ${e::class.simpleName}")
             Result.failure(e)
         }
     }
 
-    /**
-     * Trigger a debounced push to remote after a local change.
-     */
     fun triggerPush() {
         if (isSyncingFromRemote) return
-        if (!authManager.isAuthenticated) return
-        val account = (authManager.authState.value as? AuthState.FullAccount)?.userId ?: return
-        val profileId = profileManager.activeProfileId.value
+        val owner = collectionsDataStore.captureSyncOwner() ?: return
         pushJob?.cancel()
         pushJob = scope.launch {
             delay(500)
-            if ((authManager.authState.value as? AuthState.FullAccount)?.userId != account ||
-                profileManager.activeProfileId.value != profileId) return@launch
-            pushToRemote()
+            try { reconcile(owner) }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { Log.w(TAG, "Collection upload deferred: ${e::class.simpleName}") }
         }
     }
+
+    private companion object { const val TAG = "CollectionSyncService" }
 }

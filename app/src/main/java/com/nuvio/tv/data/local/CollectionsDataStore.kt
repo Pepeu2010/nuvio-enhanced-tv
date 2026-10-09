@@ -4,9 +4,14 @@ import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
 import com.nuvio.tv.R
 import com.nuvio.tv.core.profile.ProfileManager
+import com.nuvio.tv.core.auth.AuthManager
+import com.nuvio.tv.core.sync.SnapshotSyncJournal
+import com.nuvio.tv.domain.model.AuthState
+import com.nuvio.tv.domain.model.ServerConfiguration
 import com.nuvio.tv.domain.model.AddonCatalogCollectionSource
 import com.nuvio.tv.domain.model.Collection
 import com.nuvio.tv.domain.model.CollectionCatalogSource
@@ -27,6 +32,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import androidx.datastore.preferences.core.MutablePreferences
+import java.security.MessageDigest
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -42,7 +55,9 @@ data class ValidationResult(
 class CollectionsDataStore @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val factory: ProfileDataStoreFactory,
-    private val profileManager: ProfileManager
+    private val profileManager: ProfileManager,
+    private val authManager: AuthManager,
+    private val serverConfiguration: ServerConfiguration
 ) {
     companion object {
         private const val FEATURE = "collections"
@@ -52,6 +67,7 @@ class CollectionsDataStore @Inject constructor(
         factory.get(profileId, FEATURE)
 
     private val gson = Gson()
+    private val wireGson = GsonBuilder().serializeNulls().create()
     private val collectionsKey = stringPreferencesKey("collections_json")
     private fun string(resId: Int, vararg args: Any): String = appContext.getString(resId, *args)
 
@@ -62,51 +78,89 @@ class CollectionsDataStore @Inject constructor(
             }
         }
 
-    suspend fun setCollections(collections: List<Collection>) {
-        store().edit { prefs ->
-            if (collections.isEmpty()) {
-                prefs.remove(collectionsKey)
-            } else {
-                prefs[collectionsKey] = gson.toJson(collections.map { it.toSerializable() })
-            }
-        }
-    }
-
-    internal suspend fun applySyncedCollections(profileId: Int, collections: List<Collection>, stillCurrent: () -> Boolean) {
-        store(profileId).edit { prefs ->
-            if (!stillCurrent()) throw kotlinx.coroutines.CancellationException("Collection sync owner changed")
-            prefs[collectionsKey] = gson.toJson(collections.map { it.toSerializable() })
-        }
-    }
+    suspend fun setCollections(collections: List<Collection>) = mutateCollections { collections }
 
     suspend fun addCollection(collection: Collection) {
-        store().edit { prefs ->
-            val current = parseCollections(prefs[collectionsKey]).toMutableList()
-            current.add(collection)
-            prefs[collectionsKey] = gson.toJson(current.map { it.toSerializable() })
-        }
+        mutateCollections { current -> current.filterNot { it.id == collection.id } + collection }
     }
 
     suspend fun updateCollection(collection: Collection) {
-        store().edit { prefs ->
-            val current = parseCollections(prefs[collectionsKey]).toMutableList()
-            val index = current.indexOfFirst { it.id == collection.id }
-            if (index >= 0) {
-                current[index] = collection
-            }
-            prefs[collectionsKey] = gson.toJson(current.map { it.toSerializable() })
-        }
+        mutateCollections { current -> current.map { if (it.id == collection.id) collection else it } }
     }
 
     suspend fun removeCollection(collectionId: String) {
-        store().edit { prefs ->
-            val current = parseCollections(prefs[collectionsKey]).toMutableList()
-            current.removeAll { it.id == collectionId }
-            if (current.isEmpty()) {
-                prefs.remove(collectionsKey)
-            } else {
-                prefs[collectionsKey] = gson.toJson(current.map { it.toSerializable() })
+        mutateCollections { current -> current.filterNot { it.id == collectionId } }
+    }
+
+    internal fun captureSyncOwner(): CollectionSyncOwner? {
+        val account = (authManager.authState.value as? AuthState.FullAccount)?.userId ?: return null
+        return CollectionSyncOwner(account, profileManager.activeProfileId.value, serverConfiguration.backendUrl)
+    }
+
+    internal fun isCurrent(owner: CollectionSyncOwner): Boolean = captureSyncOwner() == owner
+
+    private fun requireCurrent(owner: CollectionSyncOwner) {
+        if (!isCurrent(owner)) throw kotlinx.coroutines.CancellationException("Collection sync owner changed")
+    }
+
+    private fun journal(prefs: MutablePreferences, owner: CollectionSyncOwner): SnapshotSyncJournal {
+        val encodedOwner = JsonArray(listOf(JsonPrimitive(owner.backendUrl), JsonPrimitive(owner.userId), JsonPrimitive(owner.profileId)))
+        val digest = MessageDigest.getInstance("SHA-256").digest(encodedOwner.toString().toByteArray(Charsets.UTF_8))
+            .joinToString("") { it.toUByte().toString(16).padStart(2, '0') }
+        val key = stringPreferencesKey("sync_journal_v1_$digest")
+        return SnapshotSyncJournal({ prefs[key] }, { prefs[key] = it })
+    }
+
+    private fun rawSnapshot(payload: String?): JsonArray = if (payload.isNullOrBlank()) JsonArray(emptyList())
+        else Json.parseToJsonElement(payload).jsonArray
+
+    private suspend fun mutateCollections(transform: (List<Collection>) -> List<Collection>) {
+        val profileId = profileManager.activeProfileId.value
+        val auth = authManager.authState.value
+        val owner = captureSyncOwner()
+        store(profileId).edit { prefs ->
+            if (profileManager.activeProfileId.value != profileId || authManager.authState.value != auth) {
+                throw kotlinx.coroutines.CancellationException("Collection mutation owner changed")
             }
+            val previous = rawSnapshot(prefs[collectionsKey])
+            val encoded = Json.parseToJsonElement(wireGson.toJson(transform(parseCollections(previous.toString())).map { it.toSerializable() })).jsonArray
+            val next = CollectionJsonPreserver.merge(previous, encoded)
+            if (owner != null && previous != next) journal(prefs, owner).recordLocal(previous, next)
+            prefs[collectionsKey] = next.toString()
+        }
+    }
+
+    /** Snapshot and mutation journal are committed in the same DataStore transaction. */
+    internal suspend fun reconcileRemote(owner: CollectionSyncOwner, remote: JsonArray, rowExists: Boolean): CollectionSyncApplication {
+        // Never replace a readable local snapshot with malformed domain data.
+        remote.forEach { item ->
+            val record = item as? JsonObject ?: error("Invalid collection wire item")
+            require((record["title"] as? JsonPrimitive)?.contentOrNull?.isNotBlank() == true) { "Invalid collection title" }
+            require(record["folders"] is JsonArray) { "Invalid collection folders" }
+            (record["folders"] as JsonArray).forEach { folder ->
+                val value = folder as? JsonObject ?: error("Invalid collection folder")
+                require((value["id"] as? JsonPrimitive)?.contentOrNull?.isNotBlank() == true &&
+                    (value["title"] as? JsonPrimitive)?.contentOrNull?.isNotBlank() == true) { "Invalid collection folder identity" }
+            }
+        }
+        var result: CollectionSyncApplication? = null
+        store(owner.profileId).edit { prefs ->
+            requireCurrent(owner)
+            val previous = rawSnapshot(prefs[collectionsKey])
+            val journal = journal(prefs, owner)
+            if (!rowExists && journal.pending() == null && previous.isNotEmpty()) journal.recordLocal(JsonArray(emptyList()), previous)
+            val plan = journal.plan(remote)
+            check(journal.commitPull(plan)) { "Stale collection reconciliation" }
+            prefs[collectionsKey] = plan.merged.toString()
+            result = CollectionSyncApplication(previous != plan.merged, journal.pending())
+        }
+        return checkNotNull(result)
+    }
+
+    internal suspend fun acknowledgeUpload(owner: CollectionSyncOwner, revision: Long, uploaded: JsonArray) {
+        store(owner.profileId).edit { prefs ->
+            requireCurrent(owner)
+            journal(prefs, owner).acknowledge(revision, uploaded)
         }
     }
 
