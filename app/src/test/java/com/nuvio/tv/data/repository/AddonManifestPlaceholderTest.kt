@@ -4,6 +4,7 @@ import android.content.Context
 import com.nuvio.tv.core.auth.AuthManager
 import com.nuvio.tv.core.sync.AddonSyncService
 import com.nuvio.tv.data.local.AddonPreferences
+import com.nuvio.tv.data.local.InstalledAddonPreferences
 import com.nuvio.tv.data.remote.api.AddonApi
 import com.nuvio.tv.data.remote.dto.AddonManifestDto
 import io.mockk.coEvery
@@ -15,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -255,6 +257,9 @@ class AddonManifestPlaceholderTest {
         every { preferences.installedAddonUrls } returns flowOf(listOf(addonUrl))
         every { preferences.userSetNames } returns userSetNames
         every { preferences.addonEnabledStates } returns flowOf(emptyMap())
+        every { preferences.installedSettings } returns userSetNames.map { names ->
+            InstalledAddonPreferences(listOf(addonUrl), names, emptyMap())
+        }
         coEvery { preferences.removeAddon(any()) } returns true
 
         return Harness(

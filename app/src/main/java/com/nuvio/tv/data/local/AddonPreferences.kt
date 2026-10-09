@@ -25,6 +25,10 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
+data class InstalledAddonPreferences(
+    val urls: List<String>, val names: Map<String, String>, val enabledStates: Map<String, Boolean>,
+)
+
 @Singleton
 @OptIn(ExperimentalCoroutinesApi::class)
 class AddonPreferences @Inject constructor(
@@ -60,25 +64,17 @@ class AddonPreferences @Inject constructor(
     private val addonEnabledStatesKey = stringPreferencesKey("installed_addon_enabled_states")
     private fun canonicalizeUrl(url: String): String = canonicalAddonUrl(url)
 
-    val installedAddonUrls: Flow<List<String>> = effectiveProfileIdFlow.flatMapLatest { pid ->
-        factory.get(pid, FEATURE).data.map { preferences ->
-            val json = preferences[orderedUrlsKey]
-            if (json != null) {
-                parseUrlList(json)
-            } else {
-                val legacySet = preferences[legacyUrlsKey] ?: getDefaultAddons()
-                legacySet.toList()
-            }
+    /** A single emission prevents mixed URL/name/enabled revisions in manifest consumers. */
+    val installedSettings: Flow<InstalledAddonPreferences> = effectiveProfileIdFlow.flatMapLatest { pid ->
+        factory.get(pid, FEATURE).data.map { prefs ->
+            InstalledAddonPreferences(getCurrentList(prefs),
+                prefs[userSetNamesKey]?.let(::parseNameMap).orEmpty(), getCurrentEnabledStates(prefs))
         }
-    }
+    }.distinctUntilChanged()
 
-    val addonEnabledStates: Flow<Map<String, Boolean>> = effectiveProfileIdFlow.flatMapLatest { pid ->
-        factory.get(pid, FEATURE).data.map { preferences ->
-            preferences[addonEnabledStatesKey]
-                ?.let(::parseEnabledStateMap)
-                .orEmpty()
-        }
-    }
+    val installedAddonUrls: Flow<List<String>> = installedSettings.map { it.urls }.distinctUntilChanged()
+
+    val addonEnabledStates: Flow<Map<String, Boolean>> = installedSettings.map { it.enabledStates }.distinctUntilChanged()
 
     suspend fun ensureMigrated() {
         val ds = store()
@@ -255,12 +251,7 @@ class AddonPreferences @Inject constructor(
         }
     }
 
-    val userSetNames: Flow<Map<String, String>> = effectiveProfileIdFlow.flatMapLatest { pid ->
-        factory.get(pid, FEATURE).data.map { preferences ->
-            val json = preferences[userSetNamesKey]
-            if (json != null) parseNameMap(json) else emptyMap()
-        }
-    }
+    val userSetNames: Flow<Map<String, String>> = installedSettings.map { it.names }.distinctUntilChanged()
 
     suspend fun setUserSetNames(names: Map<String, String>) {
         mutate { preferences ->

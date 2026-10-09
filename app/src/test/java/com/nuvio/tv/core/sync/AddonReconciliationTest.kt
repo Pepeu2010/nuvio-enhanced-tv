@@ -5,15 +5,22 @@ import androidx.datastore.preferences.core.*
 import com.nuvio.tv.core.auth.AuthManager
 import com.nuvio.tv.core.profile.ProfileManager
 import com.nuvio.tv.data.local.*
+import com.nuvio.tv.data.remote.api.AddonApi
+import com.nuvio.tv.data.repository.AddonRepositoryImpl
 import com.nuvio.tv.domain.model.*
 import io.mockk.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import org.junit.Assert.*
 import org.junit.Test
 import java.nio.file.Files
+import java.io.IOException
+import java.util.concurrent.atomic.AtomicInteger
 
 class AddonReconciliationTest {
     private class MemoryStore : DataStore<Preferences> {
@@ -155,6 +162,36 @@ class AddonReconciliationTest {
         val recreated = f.preferences()
         assertEquals("Brasil", recreated.userSetNames.first()[upper])
         assertEquals(false, recreated.addonEnabledStates.first()[upper])
+        val slashToken = "$a?token=ABC/"
+        assertTrue(recreated.addAddon("$a/manifest.json?token=ABC/"))
+        assertTrue(slashToken in recreated.installedAddonUrls.first())
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun repositoryConsumesDisabledUrlsNamesAndStatesFromOneRevisionWithoutFetchingManifests() = runTest {
+        val f = Fixture()
+        f.preferences.reconcileRemote(f.owner, snapshot(record(a, "Antes", false)))
+        val calls = AtomicInteger()
+        val api = mockk<AddonApi>()
+        coEvery { api.getManifest(any()) } coAnswers { calls.incrementAndGet(); throw IOException("Must stay disabled") }
+        val repository = AddonRepositoryImpl(api, f.preferences, mockk(relaxed = true), f.manager,
+            mockk(relaxed = true), UnconfinedTestDispatcher(testScheduler), System::currentTimeMillis)
+        val observed = mutableListOf<List<com.nuvio.tv.domain.model.Addon>>()
+        val collector = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            repository.getInstalledAddons().collect { observed.add(it) }
+        }
+        try {
+            assertEquals("Antes", repository.getInstalledAddons().first { it.size == 1 }.single().displayName)
+            f.preferences.reconcileRemote(f.owner, snapshot(record(a, "Atualizado", false), record(b, "Brasil", false)))
+            val current = repository.getInstalledAddons().first { it.size == 2 }
+            assertEquals(listOf("Atualizado", "Brasil"), current.map { it.displayName })
+            assertTrue(observed.flatten().all { !it.enabled })
+            assertEquals(0, calls.get())
+        } finally {
+            collector.cancelAndJoin()
+            val field = AddonRepositoryImpl::class.java.getDeclaredField("syncScope").apply { isAccessible = true }
+            (field.get(repository) as CoroutineScope).cancel()
+        }
     }
 
     @Test fun inheritedPrimaryAddonsAreReadOnlyIncludingNamesAndKeepPendingPrimaryEdits() = runBlocking {

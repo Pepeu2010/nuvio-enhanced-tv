@@ -211,11 +211,9 @@ class AddonRepositoryImpl(
     @OptIn(ExperimentalCoroutinesApi::class)
     private val installedAddonsFlow: kotlinx.coroutines.flow.StateFlow<List<Addon>> =
         combine(
-            preferences.installedAddonUrls,
-            preferences.userSetNames,
-            preferences.addonEnabledStates,
+            preferences.installedSettings,
             manifestCacheRevision
-        ) { urls, names, enabledStates, _ -> Triple(urls, names, enabledStates) }
+        ) { settings, _ -> Triple(settings.urls, settings.names, settings.enabledStates) }
         .flatMapLatest { (urls, userNames, enabledStates) ->
             flow {
                 if (urls.isEmpty()) {
