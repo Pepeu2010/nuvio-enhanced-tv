@@ -177,10 +177,6 @@ class StartupSyncService @Inject constructor(
             try {
                 val remoteAddonUrls = addonSyncService.getRemoteAddonUrls().getOrElse { throw it }
 
-                addonRepository.reconcileWithRemoteAddonUrls(
-                    remoteUrls = remoteAddonUrls,
-                    removeMissingLocal = true
-                )
 
                 Log.d(TAG, "Manual addon sync pulled ${remoteAddonUrls.size} addons for profile $profileId")
             } catch (e: Exception) {
@@ -630,10 +626,6 @@ class StartupSyncService @Inject constructor(
                 try {
                     val remoteAddonUrls = addonSyncService.getRemoteAddonUrls().getOrElse { throw it }
                     requireCurrentOwner()
-                    addonRepository.reconcileWithRemoteAddonUrls(
-                        remoteUrls = remoteAddonUrls,
-                        removeMissingLocal = true
-                    )
                     Log.d(TAG, "Pulled ${remoteAddonUrls.size} addons from remote for profile $profileId")
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e
@@ -738,10 +730,6 @@ class StartupSyncService @Inject constructor(
         addonRepository.isSyncingFromRemote = true
         try {
             val remoteAddonUrls = addonSyncService.getRemoteAddonUrls().getOrElse { throw it }
-            addonRepository.reconcileWithRemoteAddonUrls(
-                remoteUrls = remoteAddonUrls,
-                removeMissingLocal = true
-            )
             Log.d(TAG, "Realtime addons pull reconciled ${remoteAddonUrls.size} addons for profile $profileId")
         } catch (e: Exception) {
             Log.e(TAG, "Realtime addons pull failed profile=$profileId", e)

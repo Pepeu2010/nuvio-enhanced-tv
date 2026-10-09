@@ -3,152 +3,80 @@ package com.nuvio.tv.core.sync
 import android.util.Log
 import com.nuvio.tv.core.auth.AuthManager
 import com.nuvio.tv.core.profile.ProfileManager
-import com.nuvio.tv.domain.model.AuthState
-import kotlinx.coroutines.CancellationException
 import com.nuvio.tv.data.local.AddonPreferences
-import com.nuvio.tv.data.remote.supabase.SupabaseAddon
+import com.nuvio.tv.data.local.AddonSyncOwner
 import io.github.jan.supabase.postgrest.Postgrest
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.addJsonObject
+import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.*
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private const val TAG = "AddonSyncService"
-
 @Singleton
 class AddonSyncService @Inject constructor(
-    private val postgrest: Postgrest,
-    private val authManager: AuthManager,
+    postgrest: Postgrest,
+    authManager: AuthManager,
     private val addonPreferences: AddonPreferences,
     private val profileManager: ProfileManager,
-    private val syncClientIdentity: SyncClientIdentity
+    syncClientIdentity: SyncClientIdentity
 ) {
-    private suspend fun <T> withJwtRefreshRetry(block: suspend () -> T): T {
-        return try {
-            block()
-        } catch (e: Exception) {
-            if (!authManager.refreshSessionIfJwtExpired(e)) throw e
-            block()
+    private val mutex = Mutex()
+    internal var remote: AddonSyncRemote = AddonRpcRemote(postgrest, authManager, syncClientIdentity)
+
+    internal fun captureSyncOwner(): AddonSyncOwner? = addonPreferences.captureSyncOwner()
+
+    private suspend fun requireCurrent(owner: AddonSyncOwner) {
+        currentCoroutineContext().ensureActive()
+        if (!addonPreferences.isCurrent(owner) || profileManager.activeProfileId.value != owner.activeProfileId) {
+            throw CancellationException("Addon sync owner changed")
         }
     }
 
-    /**
-     * Push local addon URLs to Supabase via RPC.
-     * Uses a SECURITY DEFINER function to handle RLS for linked devices.
-     */
+    private suspend fun reconcile(owner: AddonSyncOwner): List<String> = mutex.withLock {
+        requireCurrent(owner)
+        val fetched = remote.pull(owner.profileId) { addonPreferences.isCurrent(owner) }
+        requireCurrent(owner)
+        val applied = addonPreferences.reconcileRemote(owner, fetched)
+        applied.upload?.let { (revision, snapshot) ->
+            requireCurrent(owner)
+            remote.push(owner.profileId, snapshot) { addonPreferences.isCurrent(owner) }
+            requireCurrent(owner)
+            addonPreferences.acknowledgeUpload(owner, revision, snapshot)
+        }
+        applied.snapshot.map { it.jsonObject["url"]!!.jsonPrimitive.content }
+    }
+
+    /** Local uploads first pull and merge, so independent remote edits are retained. */
     suspend fun pushToRemote(): Result<Unit> = withContext(Dispatchers.IO) {
+        val owner = captureSyncOwner() ?: return@withContext Result.failure(IllegalStateException("Addons require an account"))
+        pushForOwner(owner)
+    }
+
+    internal suspend fun pushForOwner(owner: AddonSyncOwner): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val activeProfile = profileManager.activeProfile
-            val profileId = profileManager.activeProfileId.value
-            Log.d(TAG, "pushToRemote: activeProfile=${activeProfile?.id} isPrimary=${activeProfile?.isPrimary} usesPrimaryAddons=${activeProfile?.usesPrimaryAddons} profileId=$profileId")
-
-            if (activeProfile != null && !activeProfile.isPrimary && activeProfile.usesPrimaryAddons) {
-                Log.d(TAG, "Profile ${activeProfile.id} uses primary addons, skipping push")
-                return@withContext Result.success(Unit)
-            }
-
-            val localUrls = addonPreferences.installedAddonUrls.first()
-            val userSetNames = addonPreferences.userSetNames.first()
-            val enabledStates = addonPreferences.addonEnabledStates.first()
-            Log.d(TAG, "pushToRemote: localUrls count=${localUrls.size} for profile $profileId")
-
-            val params = buildJsonObject {
-                put("p_addons", buildJsonArray {
-                    localUrls.forEachIndexed { index, url ->
-                        val canonicalUrl = canonicalizeUrl(url)
-                        addJsonObject {
-                            put("url", url)
-                            put("sort_order", index)
-                            put("enabled", enabledStates[canonicalUrl] ?: true)
-                            val name = userSetNames[canonicalUrl] ?: userSetNames[url]
-                            if (!name.isNullOrBlank()) {
-                                put("name", name)
-                            }
-                        }
-                    }
-                })
-                put("p_profile_id", profileId)
-                putSyncOriginClientId(syncClientIdentity)
-            }
-            Log.d(TAG, "pushToRemote: calling RPC sync_push_addons with profile_id=$profileId")
-            withJwtRefreshRetry {
-                postgrest.rpc("sync_push_addons", params)
-            }
-
-            Log.d(TAG, "Pushed ${localUrls.size} addons to remote for profile $profileId")
+            // Secondary profiles sharing the primary addons may read, never upload.
+            if (owner.mayUpload) reconcile(owner)
+            else requireCurrent(owner)
             Result.success(Unit)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to push addons to remote", e)
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) {
+            Log.w(TAG, "Addon upload deferred: ${e::class.simpleName}")
             Result.failure(e)
         }
     }
 
+    /** Applies all metadata atomically; the repository's existing flows publish the result. */
     suspend fun getRemoteAddonUrls(): Result<List<String>> = withContext(Dispatchers.IO) {
         try {
-            val account = (authManager.authState.value as? AuthState.FullAccount)?.userId
-                ?: return@withContext Result.failure(IllegalStateException("Addon sync requires an account"))
-            val activeProfileId = profileManager.activeProfileId.value
-            fun stillCurrent() = (authManager.authState.value as? AuthState.FullAccount)?.userId == account &&
-                profileManager.activeProfileId.value == activeProfileId
-            val effectiveUserId = authManager.getEffectiveUserId(fallbackToOwnIdOnFailure = false)
-                ?: return@withContext Result.failure(
-                    IllegalStateException("Unable to resolve sync owner for addon sync")
-                )
-
-            val activeProfile = profileManager.activeProfile
-            val profileId = if (activeProfile != null && !activeProfile.isPrimary && activeProfile.usesPrimaryAddons) 1
-                            else profileManager.activeProfileId.value
-
-            val remoteAddons = withJwtRefreshRetry {
-                postgrest.from("addons")
-                    .select { filter {
-                        eq("user_id", effectiveUserId)
-                        eq("profile_id", profileId)
-                    } }
-                    .decodeList<SupabaseAddon>()
-            }
-
-            val nameMap = mutableMapOf<String, String>()
-            val enabledMap = mutableMapOf<String, Boolean>()
-            remoteAddons.forEach { addon ->
-                val canonicalUrl = canonicalizeUrl(addon.url)
-                if (!addon.name.isNullOrBlank()) {
-                    nameMap[canonicalUrl] = addon.name
-                }
-                enabledMap[canonicalUrl] = addon.enabled
-            }
-            if (remoteAddons.isNotEmpty()) {
-                addonPreferences.applyRemoteMetadata(profileId, nameMap, enabledMap, ::stillCurrent)
-            }
-            if (!stillCurrent()) throw CancellationException("Addon sync owner changed")
-
-            Result.success(
-                remoteAddons
-                .sortedBy { it.sortOrder }
-                .map { it.url }
-            )
-        } catch (e: Exception) {
-            if (e is CancellationException) throw e
-            Log.e(TAG, "Failed to get remote addon URLs", e)
+            val owner = captureSyncOwner() ?: error("Addons require an account")
+            Result.success(reconcile(owner))
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) {
+            Log.w(TAG, "Addon reconciliation deferred: ${e::class.simpleName}")
             Result.failure(e)
         }
     }
 
-    private fun canonicalizeUrl(url: String): String {
-        val trimmed = url.trim().trimEnd('/')
-        val queryStart = trimmed.indexOf('?')
-        val path = if (queryStart >= 0) trimmed.substring(0, queryStart) else trimmed
-        val query = if (queryStart >= 0) trimmed.substring(queryStart) else ""
-        val cleanPath = if (path.endsWith("/manifest.json", ignoreCase = true)) {
-            path.dropLast("/manifest.json".length).trimEnd('/')
-        } else {
-            path.trimEnd('/')
-        }
-        return cleanPath + query
-    }
+    private companion object { const val TAG = "AddonSyncService" }
 }

@@ -14,10 +14,22 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
 import org.junit.Assert.*
 import org.junit.Test
 
 class RemoteSetupOwnershipTest {
+    private fun addons(factory: ProfileDataStoreFactory, account: MutableStateFlow<AuthState>): AddonPreferences {
+        val auth = mockk<AuthManager> { every { authState } returns account }
+        val profileManager = mockk<ProfileManager> {
+            every { activeProfileId } returns MutableStateFlow(2)
+            every { activeProfile } returns null
+            every { profiles } returns MutableStateFlow(emptyList())
+        }
+        val config = mockk<ServerConfiguration> { every { backendUrl } returns "https://fixture.invalid" }
+        return AddonPreferences(factory, profileManager, auth, config)
+    }
     private class MemoryStore : DataStore<Preferences> {
         override val data = MutableStateFlow<Preferences>(emptyPreferences())
         var beforeWrite: () -> Unit = {}
@@ -35,24 +47,27 @@ class RemoteSetupOwnershipTest {
         val memory = MemoryStore()
         val factory = mockk<ProfileDataStoreFactory>()
         every { factory.get(2, "addon_preferences") } returns memory
-        val preferences = AddonPreferences(factory, mockk<ProfileManager>(relaxed = true))
-        preferences.applyRemoteMetadata(2, mapOf("https://fixture.invalid/manifest.json" to "Brasil"),
-            mapOf("https://fixture.invalid/manifest.json" to false)) { true }
+        val preferences = addons(factory, MutableStateFlow(AuthState.FullAccount("fixture", "fixture@invalid.test")))
+        preferences.reconcileRemote(preferences.captureSyncOwner()!!,
+            Json.parseToJsonElement("""[{"url":"https://fixture.invalid/manifest.json","name":"Brasil","enabled":false}]""").jsonArray)
         assertEquals(1, memory.writes)
         assertTrue(memory.data.value[stringPreferencesKey("addon_user_set_names")]!!.contains("Brasil"))
         assertTrue(memory.data.value[stringPreferencesKey("installed_addon_enabled_states")]!!.contains("false"))
+        assertEquals("[\"https://fixture.invalid\"]", memory.data.value[stringPreferencesKey("installed_addon_urls_ordered")])
+        assertEquals(1, memory.data.value.asMap().keys.count { it.name.startsWith("sync_journal_v1_") })
         verify(exactly = 1) { factory.get(2, "addon_preferences") }
     }
 
     @Test fun ownershipChangeAtTheTransactionLeavesAddonPreferencesUntouched() = runBlocking {
         val memory = MemoryStore()
-        var current = true
-        memory.beforeWrite = { current = false }
+        val account = MutableStateFlow<AuthState>(AuthState.FullAccount("fixture", "fixture@invalid.test"))
+        memory.beforeWrite = { account.value = AuthState.SignedOut }
         val factory = mockk<ProfileDataStoreFactory>()
         every { factory.get(2, "addon_preferences") } returns memory
-        val preferences = AddonPreferences(factory, mockk<ProfileManager>(relaxed = true))
+        val preferences = addons(factory, account)
+        val owner = preferences.captureSyncOwner()!!
         var cancelled = false
-        try { preferences.applyRemoteMetadata(2, mapOf("fixture" to "name"), emptyMap()) { current } }
+        try { preferences.reconcileRemote(owner, JsonArray(emptyList())) }
         catch (_: CancellationException) { cancelled = true }
         assertTrue(cancelled)
         assertEquals(0, memory.writes)
@@ -65,7 +80,7 @@ class RemoteSetupOwnershipTest {
         every { factory.get(3, "collections") } returns memory
         val account = MutableStateFlow<AuthState>(AuthState.FullAccount("fixture", "fixture@invalid.test"))
         val auth = mockk<AuthManager> { every { authState } returns account }
-        val profiles = mockk<ProfileManager> { every { activeProfileId } returns MutableStateFlow(3) }
+        val profileManager = mockk<ProfileManager> { every { activeProfileId } returns MutableStateFlow(3) }
         val config = mockk<ServerConfiguration> { every { backendUrl } returns "https://fixture.invalid" }
         val store = CollectionsDataStore(mockk(relaxed = true), factory, profiles, auth, config)
         val owner = store.captureSyncOwner()!!

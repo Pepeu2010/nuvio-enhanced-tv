@@ -9,6 +9,7 @@ import com.google.gson.reflect.TypeToken
 import com.nuvio.tv.core.network.NetworkResult
 import com.nuvio.tv.core.network.safeApiCall
 import com.nuvio.tv.data.local.AddonPreferences
+import com.nuvio.tv.data.local.canonicalAddonUrl
 import com.nuvio.tv.data.mapper.toDomain
 import com.nuvio.tv.data.remote.api.AddonApi
 import com.nuvio.tv.domain.model.Addon
@@ -92,37 +93,19 @@ class AddonRepositoryImpl(
     private var syncJob: Job? = null
     var isSyncingFromRemote = false
 
-    private fun canonicalizeUrl(url: String): String {
-        val trimmed = url.trim().trimEnd('/')
-        // Separate path from query string so we can detect /manifest.json
-        // even when the URL carries query parameters (e.g. configurable addons).
-        val queryStart = trimmed.indexOf('?')
-        val path = if (queryStart >= 0) trimmed.substring(0, queryStart) else trimmed
-        val query = if (queryStart >= 0) trimmed.substring(queryStart) else ""
-        val cleanPath = if (path.endsWith(MANIFEST_SUFFIX, ignoreCase = true)) {
-            path.dropLast(MANIFEST_SUFFIX.length).trimEnd('/')
-        } else {
-            path.trimEnd('/')
-        }
-        return cleanPath + query
-    }
-
-    private fun normalizeUrl(url: String): String = canonicalizeUrl(url).lowercase()
+    private fun canonicalizeUrl(url: String): String = canonicalAddonUrl(url)
 
     private fun triggerRemoteSync() {
         if (isSyncingFromRemote) {
             Log.d(TAG, "triggerRemoteSync: skipped (syncing from remote)")
             return
         }
-        if (!authManager.isAuthenticated) {
-            Log.d(TAG, "triggerRemoteSync: skipped (not authenticated, state=${authManager.authState.value})")
-            return
-        }
+        val owner = addonSyncService.captureSyncOwner() ?: return
         Log.d(TAG, "triggerRemoteSync: scheduling push in 500ms")
         syncJob?.cancel()
         syncJob = syncScope.launch {
             delay(500)
-            val result = addonSyncService.pushToRemote()
+            val result = addonSyncService.pushForOwner(owner)
             Log.d(TAG, "triggerRemoteSync: push result=${result.isSuccess} error=${result.exceptionOrNull()?.javaClass?.simpleName ?: "none"}")
         }
     }
@@ -348,65 +331,6 @@ class AddonRepositoryImpl(
             fetchAddon(cleanUrl)
         }
         triggerRemoteSync()
-    }
-
-    suspend fun reconcileWithRemoteAddonUrls(
-        remoteUrls: List<String>,
-        removeMissingLocal: Boolean = true
-    ) {
-        val normalizedRemote = remoteUrls
-            .map { canonicalizeUrl(it) }
-            .filter { it.isNotBlank() }
-            .distinctBy { normalizeUrl(it) }
-        val remoteSet = normalizedRemote.map { normalizeUrl(it) }.toSet()
-
-        val initialLocalUrls = preferences.installedAddonUrls.first()
-        val initialLocalSet = initialLocalUrls.map { normalizeUrl(it) }.toSet()
-        val shouldRemoveMissingLocal = if (removeMissingLocal && normalizedRemote.isEmpty() && initialLocalUrls.isNotEmpty()) {
-            Log.w(
-                TAG,
-                "reconcileWithRemoteAddonUrls: remote list empty while local has ${initialLocalUrls.size} entries; preserving local addons"
-            )
-            false
-        } else {
-            removeMissingLocal
-        }
-
-     
-        val localByNormalized = linkedMapOf<String, String>()
-        initialLocalUrls.forEach { url ->
-            localByNormalized.putIfAbsent(normalizeUrl(url), canonicalizeUrl(url))
-        }
-
-        val remoteOrdered = normalizedRemote.map { remote ->
-            localByNormalized[normalizeUrl(remote)] ?: remote
-        }
-
-        val finalList = if (shouldRemoveMissingLocal) {
-            remoteOrdered
-        } else {
-            val extras = initialLocalUrls
-                .map { canonicalizeUrl(it) }
-                .filter { normalizeUrl(it) !in remoteSet }
-            remoteOrdered + extras
-        }
-
-        if (shouldRemoveMissingLocal) {
-            val removedAny = initialLocalUrls
-                .filter { normalizeUrl(it) !in remoteSet }
-                .map { canonicalizeUrl(it) }
-                .fold(false) { removed, url -> removeCachedManifest(url) || removed }
-            if (removedAny) {
-                persistManifestCacheToDisk()
-                bumpManifestCacheRevision()
-            }
-        }
-
-
-        val currentCanonical = initialLocalUrls.map { canonicalizeUrl(it) }
-        if (finalList != currentCanonical) {
-            preferences.setAddonOrder(finalList)
-        }
     }
 
     private fun placeholderAddon(

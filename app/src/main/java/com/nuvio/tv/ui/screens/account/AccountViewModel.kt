@@ -739,10 +739,6 @@ class AccountViewModel @Inject constructor(
 
             addonRepository.isSyncingFromRemote = true
             val remoteAddonUrls = addonSyncService.getRemoteAddonUrls().getOrElse { throw it }
-            addonRepository.reconcileWithRemoteAddonUrls(
-                remoteUrls = remoteAddonUrls,
-                removeMissingLocal = true
-            )
             addonRepository.isSyncingFromRemote = false
 
             val isTraktConnected = traktAuthDataStore.isEffectivelyAuthenticated.first()
