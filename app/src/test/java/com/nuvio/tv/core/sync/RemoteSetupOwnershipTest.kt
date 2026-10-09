@@ -82,7 +82,7 @@ class RemoteSetupOwnershipTest {
         val auth = mockk<AuthManager> { every { authState } returns account }
         val profileManager = mockk<ProfileManager> { every { activeProfileId } returns MutableStateFlow(3) }
         val config = mockk<ServerConfiguration> { every { backendUrl } returns "https://fixture.invalid" }
-        val store = CollectionsDataStore(mockk(relaxed = true), factory, profiles, auth, config)
+        val store = CollectionsDataStore(mockk(relaxed = true), factory, profileManager, auth, config)
         val owner = store.captureSyncOwner()!!
         memory.beforeWrite = { account.value = AuthState.SignedOut }
         var cancelled = false
