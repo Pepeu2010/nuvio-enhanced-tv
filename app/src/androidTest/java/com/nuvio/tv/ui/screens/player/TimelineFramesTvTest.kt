@@ -119,7 +119,9 @@ class TimelineFramesTvTest {
     @Test fun actualHttpExtractionCarriesExactAddonHeadersAndRangeWithoutCredentialsInState() {
         val clip = originalTimelineVideo(context)
         val requests = CopyOnWriteArrayList<Map<String, String>>()
-        val socket = ServerSocket(0, 4, java.net.InetAddress.getLoopbackAddress())
+        // Match the IPv4 URL explicitly: Android may return ::1 for getLoopbackAddress().
+        val socket = ServerSocket(0, 4, java.net.InetAddress.getByName("127.0.0.1"))
+        val requestReceived = java.util.concurrent.CountDownLatch(1)
         val worker = Thread {
             while (!socket.isClosed) try {
                 socket.accept().use { connection ->
@@ -133,6 +135,7 @@ class TimelineFramesTvTest {
                         val colon = line.indexOf(':'); if (colon > 0) headers[line.substring(0, colon).lowercase()] = line.substring(colon + 1).trim()
                     }
                     requests += headers
+                    requestReceived.countDown()
                     val bytes = clip.readBytes()
                     val range = Regex("bytes=(\\d+)-(\\d*)").matchEntire(headers["range"].orEmpty())
                     val begin = range?.groupValues?.get(1)?.toInt() ?: 0
@@ -156,6 +159,7 @@ class TimelineFramesTvTest {
             main { reader = extractor("http://127.0.0.1:${socket.localPort}/original.mp4", mapOf("Authorization" to "Bearer local-fixture", "X-Addon" to "alpha,beta\\tail")) }
             lateinit var future: com.google.common.util.concurrent.ListenableFuture<TelumiaFrameExtractor.Frame>
             main { future = reader!!.getFrame(4500) }
+            assertTrue("The owned IPv4 fixture must receive an HTTP request", requestReceived.await(4, TimeUnit.SECONDS))
             val frame = future.get(8, TimeUnit.SECONDS)
             assertEquals(4500L, frame.presentationTimeMs); assertColor(frame, false)
             assertTrue(requests.isNotEmpty())

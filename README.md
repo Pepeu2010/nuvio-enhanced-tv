@@ -2,9 +2,15 @@
 
 ![Telumia](https://raw.githubusercontent.com/Pepeu2010/telumia/main/assets/brand/telumia-banner.png)
 
-Cliente nativo Telumia para **Android TV — Kotlin, Compose TV e Media3**, com foco no Brasil, catálogos configuráveis, perfis, biblioteca e reprodução.
+**Seu cinema, suas séries e novelas — com foco no Brasil.** Cliente nativo Telumia para Android TV, desenvolvido sobre a infraestrutura do Nuvio TV com Kotlin, Compose TV e Media3. Possui marca e identidade próprias, preservando contas, biblioteca, progresso e addons compatíveis.
 
-Marca e logo próprios. A entrega 0.2.0-alpha.1 acrescenta aliases brasileiros de Iludida, idioma inicial TMDB pt-BR e seleção do corte brasileiro entre fontes de metadados instaladas, preservando os IDs de capítulos. A edição de 78 capítulos exige uma fonte que a ofereça. Fontes que só fornecem 31 episódios não são artificialmente expandidas.
+## Versão 1.0.0
+
+A versão atual é **1.0.0**, sem sufixo alpha, com novo código de versão 10000. A publicação dos novos pacotes está em preparação. O APK universal funciona nas arquiteturas suportadas; também há variantes ARM64, ARM32, x86 e x86_64. A distribuição continua **Android TV Full Debug**, com a identidade e assinatura de desenvolvimento anteriores para permitir atualização. Não há interface específica para celular.
+
+Inclui Home e detalhes cinematográficos, seleção e edição local de avatares, navegação/motion por D-pad, cache Auto/Manual, momentos salvos e mesclagem durável de coleções/addons. A base de extração de frames usa decoder Media3 separado, timestamps reais e transporte de prévia restrito à origem. A integração visual das miniaturas/filmstrip com o controle ainda está em desenvolvimento. [Alcance e limites](https://github.com/Pepeu2010/telumia/blob/main/docs/VERSION_100.md).
+
+Buscar **Iludida** consulta nomes alternativos e prefere a edição brasileira quando uma fonte instalada oferece seus 78 capítulos. Os IDs de reprodução são preservados. Fontes com 31 episódios conservam essa edição, sem capítulos inventados. Português do Brasil é o idioma inicial dos metadados de perfis novos.
 
 [Downloads e status](https://github.com/Pepeu2010/telumia/releases) · [Especificação e limites](https://github.com/Pepeu2010/telumia/blob/main/docs/TELUMIA.md) · [Roadmap](https://github.com/Pepeu2010/telumia/blob/main/docs/ROADMAP.md).
 
@@ -12,13 +18,13 @@ Marca e logo próprios. A entrega 0.2.0-alpha.1 acrescenta aliases brasileiros d
 
 O código em desenvolvimento inclui o editor de avatar pessoal no fluxo existente de perfis: biblioteca integrada com 64 ilustrações licenciadas, arquivo local, clipboard com URI de imagem, recorte, zoom e versões PNG otimizadas. Em aparelhos sem seletor de documentos, a escolha usa fotos locais com permissão solicitada somente ao abrir a ação. O armazenamento é privado, separado do cache e isolado por conta e identidade do perfil.
 
-Este incremento passou 111 testes unitários selecionados, quatro testes do decoder Android e cinco testes de interface por resolução em 720p, 1080p e 4K. A validação usa emulador e imagens controladas; não comprova todos os seletores de fabricantes nem desempenho em TV física. O editor está na release pública 0.2.1-alpha.1; a versão 0.2.0 preserva os binários anteriores. [Evidências e pendências](https://github.com/Pepeu2010/telumia/blob/main/docs/PROFILE_STUDIO.md).
+Os incrementos anteriores possuem testes de decoder e interface em 720p, 1080p e 4K. A validação usa emulador e imagens controladas; não comprova todos os seletores de fabricantes nem desempenho em TV física. [Evidências e pendências](https://github.com/Pepeu2010/telumia/blob/main/docs/PROFILE_STUDIO.md).
 
 ```sh
 ./gradlew :app:assembleFullDebug
 ```
 
-Use as instruções de configuração local do [projeto central](https://github.com/Pepeu2010/telumia). Não publique arquivos de credenciais ou keystores. A implementação completa continua em execução: a nova marca e a busca Brasil não concluem Profile Studio, cache Auto, timeline, Live TV/EPG, Scene Info ou Phone Remote.
+Use as instruções de configuração local do [projeto central](https://github.com/Pepeu2010/telumia). Não publique arquivos de credenciais ou keystores. A meta integral continua em execução: faltam Scene Info completo, Source Intelligence, Live TV/EPG, Phone Remote, Smart Collections, downloads avançados e o redesign de todas as superfícies. Sincronização com conta oficial, reprodução/HDR e desempenho em TV física exigem evidências próprias. Avatares locais e bookmarks não são anunciados como sincronizados por contratos remotos que não os suportam.
 
 ## Licença
 
