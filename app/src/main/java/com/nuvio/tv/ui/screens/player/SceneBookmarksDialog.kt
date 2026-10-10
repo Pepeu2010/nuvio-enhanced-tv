@@ -22,10 +22,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.Text
 import com.nuvio.tv.R
 import com.nuvio.tv.ui.screens.detail.requestFocusAfterFrames
 import com.nuvio.tv.ui.theme.NuvioTheme
+import com.nuvio.tv.ui.theme.LocalUiMotion
 import java.text.DateFormat
 import java.util.Date
 
@@ -49,6 +51,8 @@ internal fun SceneBookmarksDialog(
     val close = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val writable = !state.loading && !state.busy && !state.failed && state.scope != null
+    val motion = LocalUiMotion.current
+    val actionScale = ButtonDefaults.scale(focusedScale = motion.scale(1.03f), pressedScale = motion.scale(0.98f))
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         BoxWithConstraints(Modifier.fillMaxSize().padding(24.dp)) {
             val compact = maxHeight < 440.dp
@@ -63,9 +67,9 @@ internal fun SceneBookmarksDialog(
                 if (pendingJump != null) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(R.string.scene_bookmarks_confirm_notice), maxLines = 3)
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(onClick = { pendingJump?.let { onJump(it, true) }; pendingJump = null },
+                        Button(onClick = { pendingJump?.let { onJump(it, true) }; pendingJump = null }, scale = actionScale,
                             modifier = Modifier.testTag("scene-bookmark-confirm")) { Text(stringResource(R.string.scene_bookmarks_confirm)) }
-                        Button(onClick = { pendingJump = null }) { Text(stringResource(R.string.scene_bookmarks_cancel_jump)) }
+                        Button(onClick = { pendingJump = null }, scale = actionScale) { Text(stringResource(R.string.scene_bookmarks_cancel_jump)) }
                     }
                 } else Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(value = name, onValueChange = { name = it.filterNot(Char::isISOControl).take(128) },
@@ -84,7 +88,7 @@ internal fun SceneBookmarksDialog(
                     Button(onClick = {
                         val id = editingId
                         if (id == null) onSave(name) else { onRename(id, name); editingId = null; name = defaultName }
-                    }, enabled = writable && name.isNotBlank() && (editingId != null || canSave),
+                    }, enabled = writable && name.isNotBlank() && (editingId != null || canSave), scale = actionScale,
                         modifier = Modifier.focusRequester(first).testTag("scene-bookmark-save")) {
                         Text(if (editingId == null) stringResource(R.string.scene_bookmarks_save, formatTime(positionMs))
                             else stringResource(R.string.scene_bookmarks_rename))
@@ -94,7 +98,7 @@ internal fun SceneBookmarksDialog(
                     state.loading || state.busy -> Text(stringResource(R.string.scene_bookmarks_loading))
                     state.failed -> Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(stringResource(R.string.scene_bookmarks_error), modifier = Modifier.weight(1f))
-                        Button(onClick = onRetry) { Text(stringResource(R.string.scene_bookmarks_retry)) }
+                        Button(onClick = onRetry, scale = actionScale) { Text(stringResource(R.string.scene_bookmarks_retry)) }
                     }
                     state.scope == null -> Text(stringResource(R.string.scene_bookmarks_unavailable))
                     state.items.isEmpty() -> Text(stringResource(R.string.scene_bookmarks_empty))
@@ -104,6 +108,7 @@ internal fun SceneBookmarksDialog(
                     items(state.items, key = { it.id }) { item ->
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Button(onClick = { if (item.editionKey == state.scope?.editionKey) onJump(item.id, false) else pendingJump = item.id }, enabled = writable,
+                                scale = ButtonDefaults.scale(focusedScale = 1f, pressedScale = 1f),
                                 modifier = Modifier.weight(1f).testTag("scene-bookmark-jump-${item.id}")) {
                                 Column {
                                     Text("${formatTime(item.positionMs)} · ${item.name}", maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -113,16 +118,16 @@ internal fun SceneBookmarksDialog(
                                         style = androidx.tv.material3.MaterialTheme.typography.labelSmall)
                                 }
                             }
-                            Button(onClick = { editingId = item.id; name = item.name; first.requestFocus() }, enabled = writable,
+                            Button(onClick = { editingId = item.id; name = item.name; first.requestFocus() }, enabled = writable, scale = actionScale,
                                 modifier = Modifier.testTag("scene-bookmark-rename-${item.id}")) { Text(stringResource(R.string.scene_bookmarks_rename)) }
-                            Button(onClick = { onRemove(item.id) }, enabled = writable,
+                            Button(onClick = { onRemove(item.id) }, enabled = writable, scale = actionScale,
                                 modifier = Modifier.testTag("scene-bookmark-remove-${item.id}")) { Text(stringResource(R.string.scene_bookmarks_remove)) }
                         }
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    if (editingId != null) Button(onClick = { editingId = null; name = defaultName }) { Text(stringResource(R.string.scene_bookmarks_cancel)) }
-                    Button(onClick = onDismiss, modifier = Modifier.focusRequester(close).testTag("scene-bookmark-close")) {
+                    if (editingId != null) Button(onClick = { editingId = null; name = defaultName }, scale = actionScale) { Text(stringResource(R.string.scene_bookmarks_cancel)) }
+                    Button(onClick = onDismiss, scale = actionScale, modifier = Modifier.focusRequester(close).testTag("scene-bookmark-close")) {
                         Text(stringResource(R.string.scene_bookmarks_close))
                     }
                 }
