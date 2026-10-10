@@ -40,6 +40,9 @@ import android.graphics.Matrix;
 import android.media.MediaCodec;
 import android.opengl.GLES20;
 import android.opengl.GLES30;
+import android.opengl.EGLContext;
+import android.opengl.EGLDisplay;
+import android.opengl.EGLSurface;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.SurfaceView;
@@ -65,6 +68,9 @@ import androidx.media3.common.util.NullableType;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
 import androidx.media3.effect.GlEffect;
+import androidx.media3.effect.DefaultGlObjectsProvider;
+import androidx.media3.effect.DefaultVideoFrameProcessor;
+import androidx.media3.effect.SingleInputVideoGraph;
 import androidx.media3.effect.GlShaderProgram;
 import androidx.media3.effect.MatrixTransformation;
 import androidx.media3.effect.PassthroughShaderProgram;
@@ -83,6 +89,8 @@ import androidx.media3.exoplayer.mediacodec.MediaCodecAdapter;
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector;
 import androidx.media3.exoplayer.source.MediaSource;
 import androidx.media3.exoplayer.video.MediaCodecVideoRenderer;
+import androidx.media3.exoplayer.video.PlaybackVideoGraphWrapper;
+import androidx.media3.exoplayer.video.VideoFrameReleaseControl;
 import androidx.media3.exoplayer.video.VideoRendererEventListener;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.FutureCallback;
@@ -650,6 +658,40 @@ public final class TelumiaFrameExtractor {
     }
   }
 
+  /** SDR previews on API 24/25 need ES2, without an ES3 probe terminating the EGL display. */
+  private static final class LegacyPreviewGlObjectsProvider implements GlObjectsProvider {
+    private final DefaultGlObjectsProvider delegate = new DefaultGlObjectsProvider();
+
+    @Override
+    public EGLContext createEglContext(EGLDisplay display, int openGlVersion, int[] attributes)
+        throws GlUtil.GlException {
+      return delegate.createEglContext(display, 2, attributes);
+    }
+
+    @Override
+    public EGLSurface createEglSurface(EGLDisplay display, Object surface, int colorTransfer,
+        boolean encoderInputSurface) throws GlUtil.GlException {
+      return delegate.createEglSurface(display, surface, colorTransfer, encoderInputSurface);
+    }
+
+    @Override
+    public EGLSurface createFocusedPlaceholderEglSurface(EGLContext context, EGLDisplay display)
+        throws GlUtil.GlException {
+      return delegate.createFocusedPlaceholderEglSurface(context, display);
+    }
+
+    @Override
+    public GlTextureInfo createBuffersForTexture(int texture, int width, int height)
+        throws GlUtil.GlException {
+      return delegate.createBuffersForTexture(texture, width, height);
+    }
+
+    @Override
+    public void release(EGLDisplay display) throws GlUtil.GlException {
+      delegate.release(display);
+    }
+  }
+
   /** A custom MediaCodecVideoRenderer that renders only one frame per position reset. */
   private final class FrameExtractorRenderer extends MediaCodecVideoRenderer {
     private final boolean toneMapHdrToSdr;
@@ -672,6 +714,20 @@ public final class TelumiaFrameExtractor {
               .setMaxDroppedFramesToNotify(0));
       this.toneMapHdrToSdr = toneMapHdrToSdr;
       effectsFromPlayer = ImmutableList.of();
+    }
+
+    @Override
+    protected PlaybackVideoGraphWrapper createPlaybackVideoGraphWrapper(
+        Context context, VideoFrameReleaseControl frameReleaseControl) {
+      if (SDK_INT > 25) {
+        return super.createPlaybackVideoGraphWrapper(context, frameReleaseControl);
+      }
+      // Only this bounded SDR preview graph uses ES2; the main playback engine stays unchanged.
+      DefaultVideoFrameProcessor.Factory factory = new DefaultVideoFrameProcessor.Factory.Builder()
+          .setGlObjectsProvider(new LegacyPreviewGlObjectsProvider()).build();
+      return new PlaybackVideoGraphWrapper.Builder(context, frameReleaseControl)
+          .setVideoGraphFactory(new SingleInputVideoGraph.Factory(factory))
+          .setEnablePlaylistMode(true).setClock(getClock()).build();
     }
 
     @Override
