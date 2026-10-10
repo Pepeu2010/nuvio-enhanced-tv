@@ -156,12 +156,28 @@ class TimelineFramesTvTest {
         }.apply { isDaemon = true; start() }
         var reader: TelumiaFrameExtractor? = null
         try {
-            main { reader = extractor("http://127.0.0.1:${socket.localPort}/original.mp4", mapOf("Authorization" to "Bearer local-fixture", "X-Addon" to "alpha,beta\\tail")) }
+            val url = "http://127.0.0.1:${socket.localPort}/original.mp4"
+            val headers = mapOf("Authorization" to "Bearer local-fixture", "X-Addon" to "alpha,beta\\tail")
+            main { reader = extractor(url, headers) }
             lateinit var future: com.google.common.util.concurrent.ListenableFuture<TelumiaFrameExtractor.Frame>
             main { future = reader!!.getFrame(4500) }
             assertTrue("The owned IPv4 fixture must receive an HTTP request", requestReceived.await(4, TimeUnit.SECONDS))
             val frame = future.get(8, TimeUnit.SECONDS)
             assertEquals(4500L, frame.presentationTimeMs); assertColor(frame, false)
+            // A tiny MP4 may fit in the extractor's input buffer without reopening HTTP.
+            // Exercise a real bounded range through the same Media3 DataSource transport.
+            val rangeSource = PlayerPlaybackNetworking.createTimelineDataSourceFactory(context, url, headers).createDataSource()
+            try {
+                rangeSource.open(androidx.media3.datasource.DataSpec.Builder().setUri(url).setPosition(32).setLength(64).build())
+                val received = ByteArray(64)
+                var count = 0
+                while (count < received.size) {
+                    val read = rangeSource.read(received, count, received.size - count)
+                    check(read > 0) { "Native range ended before its requested bytes" }
+                    count += read
+                }
+                assertArrayEquals(clip.readBytes().copyOfRange(32, 96), received)
+            } finally { rangeSource.close() }
             assertTrue(requests.isNotEmpty())
             assertTrue(requests.all { it["authorization"] == "Bearer local-fixture" && it["x-addon"] == "alpha,beta\\tail" })
             assertTrue(requests.any { it["range"]?.startsWith("bytes=") == true })
