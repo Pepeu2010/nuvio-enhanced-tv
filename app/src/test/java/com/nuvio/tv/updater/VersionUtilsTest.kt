@@ -6,6 +6,14 @@ import org.junit.Test
 
 class VersionUtilsTest {
     @Test
+    fun `Telumia one release upgrades every published alpha`() {
+        assertTrue(VersionUtils.isRemoteNewer("1.0.0", "0.2.2-alpha.1"))
+        assertTrue(VersionUtils.isRemoteNewer("1.0.0", "1.0.0-alpha.1"))
+        assertFalse(VersionUtils.isPrerelease("1.0.0"))
+        assertFalse(VersionUtils.isRemoteNewer("0.2.2-alpha.1", "1.0.0"))
+    }
+
+    @Test
     fun `stable release is newer than its prerelease`() {
         assertTrue(VersionUtils.isRemoteNewer("1.1.0", "1.1.0-rc.2"))
     }
