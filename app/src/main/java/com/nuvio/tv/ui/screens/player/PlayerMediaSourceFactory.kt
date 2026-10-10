@@ -153,6 +153,32 @@ internal class PlayerMediaSourceFactory(private val context: Context) {
         customSubtitleParserFactory = subtitleParserFactory
     }
 
+    /** Existing Media3 transport with origin-bound auth; no main VOD/native cache acquisition. */
+    fun timelineMediaSourceFactory(
+        url: String,
+        headers: Map<String, String>,
+    ): MediaSource.Factory {
+        val uri = Uri.parse(url)
+        require(url.length in 1..16384 && url.none { it == '\r' || it == '\n' || it == '\u0000' } &&
+            (uri.scheme?.lowercase(Locale.ROOT) in setOf("http", "https", "file", "content") ||
+                (uri.scheme == null && url.startsWith('/')))) { "Unsupported preview source" }
+        require(headers.size <= 32 && headers.entries.all { (name, value) ->
+            name.isNotBlank() && name.length <= 256 && value.length <= 4096 &&
+                name.none { it == '\r' || it == '\n' || it == '\u0000' } &&
+                value.none { it == '\r' || it == '\n' || it == '\u0000' }
+        } && headers.entries.sumOf { it.key.length + it.value.length } <= 16384) { "Invalid preview headers" }
+        val upstream = PlayerPlaybackNetworking.createTimelineDataSourceFactory(context, url, headers.toMap())
+        val factory = DefaultMediaSourceFactory(upstream, DefaultExtractorsFactory()).apply {
+            setLoadErrorHandlingPolicy(loadErrorHandlingPolicy)
+        }
+        return object : MediaSource.Factory by factory {
+            override fun createMediaSource(mediaItem: MediaItem): MediaSource {
+                check(mediaItem.localConfiguration?.uri?.toString() == url) { "Preview source changed" }
+                return factory.createMediaSource(mediaItem)
+            }
+        }
+    }
+
     fun createMediaSource(
         context: Context,
         url: String,

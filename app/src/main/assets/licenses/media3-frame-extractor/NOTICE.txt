@@ -1,0 +1,14 @@
+TelumiaFrameExtractor adapts ExperimentalFrameExtractor from AndroidX Media3 1.8.0.
+
+Original source:
+https://github.com/androidx/media/blob/1.8.0/libraries/transformer/src/main/java/androidx/media3/transformer/ExperimentalFrameExtractor.java
+SHA-256: 5af2b7a711818f9a79df620122f28584c1585cd4820512552813a3f56ad6f687
+
+Copyright 2024 The Android Open Source Project.
+Licensed under the Apache License, Version 2.0 (see LICENSE.txt).
+
+Telumia modifications: package/class name and constructor injection of the
+existing playback MediaSource.Factory, plus a bounded 4 MiB / 1.5 s load-control
+budget for preview extraction. The bundled ExoPlayer engine remains
+unchanged. The injected factory is necessary because the 1.8.0 API constructs
+its own default transport and does not expose per-source HTTP header support.
